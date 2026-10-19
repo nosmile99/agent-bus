@@ -26,7 +26,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
-import com.astryx.kitchensink.ui.Buttons
 import com.astryx.kitchensink.ui.Routes
 
 private data class Category(val route: String, val label: String, val blurb: String, val icon: ImageVector)
