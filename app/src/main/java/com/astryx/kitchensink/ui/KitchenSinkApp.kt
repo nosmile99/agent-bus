@@ -20,7 +20,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.navigation.NavDestination.Companion.hasRoute
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -37,28 +36,29 @@ import com.astryx.kitchensink.ui.screens.InputsScreen
 import com.astryx.kitchensink.ui.screens.ListsScreen
 import com.astryx.kitchensink.ui.screens.NavigationScreen
 import com.astryx.kitchensink.ui.screens.SelectionScreen
-import kotlinx.serialization.Serializable
 
-/** All destinations. Bottom-nav tabs are the four roots; the rest are detail screens. */
-@Serializable object Home
-@Serializable object Foundations
-@Serializable object Components
-@Serializable object Brand
-@Serializable object Buttons
-@Serializable object Cards
-@Serializable object Inputs
-@Serializable object Selection
-@Serializable object Feedback
-@Serializable object Lists
-@Serializable object Navigation
+/** Route names. Bottom-nav tabs are the four roots; the rest are detail screens. */
+object Routes {
+    const val HOME = "home"
+    const val FOUNDATIONS = "foundations"
+    const val COMPONENTS = "components"
+    const val BRAND = "brand"
+    const val BUTTONS = "buttons"
+    const val CARDS = "cards"
+    const val INPUTS = "inputs"
+    const val SELECTION = "selection"
+    const val FEEDBACK = "feedback"
+    const val LISTS = "lists"
+    const val NAVIGATION = "navigation"
+}
 
-private data class Tab(val route: Any, val label: String, val icon: ImageVector)
+private data class Tab(val route: String, val label: String, val icon: ImageVector)
 
 private val tabs = listOf(
-    Tab(Home, "Home", Icons.Filled.Apps),
-    Tab(Foundations, "Foundations", Icons.Filled.Token),
-    Tab(Components, "Components", Icons.Filled.Widgets),
-    Tab(Brand, "Brand", Icons.Filled.Palette),
+    Tab(Routes.HOME, "Home", Icons.Filled.Apps),
+    Tab(Routes.FOUNDATIONS, "Foundations", Icons.Filled.Token),
+    Tab(Routes.COMPONENTS, "Components", Icons.Filled.Widgets),
+    Tab(Routes.BRAND, "Brand", Icons.Filled.Palette),
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -85,12 +85,12 @@ fun KitchenSinkApp(darkTheme: Boolean, onToggleTheme: () -> Unit) {
         bottomBar = {
             NavigationBar {
                 tabs.forEach { tab ->
-                    val selected = destination?.hierarchy?.any { it.hasRoute(tab.route::class) } == true
+                    val selected = destination?.hierarchy?.any { it.route == tab.route } == true
                     NavigationBarItem(
                         selected = selected,
                         onClick = {
                             navController.navigate(tab.route) {
-                                popUpTo(Home) { saveState = true }
+                                popUpTo(Routes.HOME) { saveState = true }
                                 launchSingleTop = true
                                 restoreState = true
                             }
@@ -104,12 +104,12 @@ fun KitchenSinkApp(darkTheme: Boolean, onToggleTheme: () -> Unit) {
     ) { innerPadding ->
         NavHost(
             navController = navController,
-            startDestination = Home,
+            startDestination = Routes.HOME,
             modifier = Modifier.padding(innerPadding),
         ) {
-            composable<Home> { HomeScreen(onOpenComponents = { navController.navigate(Components) }) }
-            composable<Foundations> { FoundationsScreen() }
-            composable<Components> {
+            composable(Routes.HOME) { HomeScreen(onOpenComponents = { navController.navigate(Routes.COMPONENTS) }) }
+            composable(Routes.FOUNDATIONS) { FoundationsScreen() }
+            composable(Routes.COMPONENTS) {
                 ComponentsScreen(
                     onOpen = { route ->
                         navController.navigate(route) {
@@ -118,14 +118,14 @@ fun KitchenSinkApp(darkTheme: Boolean, onToggleTheme: () -> Unit) {
                     },
                 )
             }
-            composable<Brand> { BrandScreen() }
-            composable<Buttons> { ButtonsScreen() }
-            composable<Cards> { CardsScreen() }
-            composable<Inputs> { InputsScreen() }
-            composable<Selection> { SelectionScreen() }
-            composable<Feedback> { FeedbackScreen() }
-            composable<Lists> { ListsScreen() }
-            composable<Navigation> { NavigationScreen() }
+            composable(Routes.BRAND) { BrandScreen() }
+            composable(Routes.BUTTONS) { ButtonsScreen() }
+            composable(Routes.CARDS) { CardsScreen() }
+            composable(Routes.INPUTS) { InputsScreen() }
+            composable(Routes.SELECTION) { SelectionScreen() }
+            composable(Routes.FEEDBACK) { FeedbackScreen() }
+            composable(Routes.LISTS) { ListsScreen() }
+            composable(Routes.NAVIGATION) { NavigationScreen() }
         }
     }
 }

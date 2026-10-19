@@ -27,27 +27,22 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import com.astryx.kitchensink.ui.Buttons
-import com.astryx.kitchensink.ui.Cards
-import com.astryx.kitchensink.ui.Feedback
-import com.astryx.kitchensink.ui.Inputs
-import com.astryx.kitchensink.ui.Lists
-import com.astryx.kitchensink.ui.Navigation
-import com.astryx.kitchensink.ui.Selection
+import com.astryx.kitchensink.ui.Routes
 
-private data class Category(val route: Any, val label: String, val blurb: String, val icon: ImageVector)
+private data class Category(val route: String, val label: String, val blurb: String, val icon: ImageVector)
 
 private val categories = listOf(
-    Category(Buttons, "Buttons", "Filled, tonal, outlined, text, icon, FAB", Icons.Filled.SmartButton),
-    Category(Cards, "Cards", "Elevated, filled, outlined", Icons.Filled.CreditCard),
-    Category(Inputs, "Inputs", "Text fields, search, password", Icons.Filled.TextFields),
-    Category(Selection, "Selection", "Checkbox, radio, switch, slider", Icons.Filled.CheckBox),
-    Category(Feedback, "Feedback", "Progress, dialogs, badges, snackbar", Icons.Filled.Feedback),
-    Category(Lists, "Lists", "List items, dividers, lazy rows", Icons.Filled.List),
-    Category(Navigation, "Navigation", "Tabs, segmented buttons", Icons.Filled.Navigation),
+    Category(Routes.BUTTONS, "Buttons", "Filled, tonal, outlined, text, icon, FAB", Icons.Filled.SmartButton),
+    Category(Routes.CARDS, "Cards", "Elevated, filled, outlined", Icons.Filled.CreditCard),
+    Category(Routes.INPUTS, "Inputs", "Text fields, search, password", Icons.Filled.TextFields),
+    Category(Routes.SELECTION, "Selection", "Checkbox, radio, switch, slider", Icons.Filled.CheckBox),
+    Category(Routes.FEEDBACK, "Feedback", "Progress, dialogs, badges, snackbar", Icons.Filled.Feedback),
+    Category(Routes.LISTS, "Lists", "List items, dividers, lazy rows", Icons.Filled.List),
+    Category(Routes.NAVIGATION, "Navigation", "Tabs, segmented buttons", Icons.Filled.Navigation),
 )
 
 @Composable
-fun ComponentsScreen(onOpen: (Any) -> Unit) {
+fun ComponentsScreen(onOpen: (String) -> Unit) {
     LazyVerticalGrid(
         columns = GridCells.Fixed(2),
         modifier = Modifier
