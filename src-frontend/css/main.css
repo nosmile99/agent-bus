@@ -1,0 +1,87 @@
+:root {
+  --bg-outer: #E2DDD3;
+  --bg-paper: #F4F1EA;
+  --bg-card: #FAF8F5;
+  --bg-recessed: #EAE5DC;
+  --text-ink: #161615;
+  --bg-charcoal: #262523;
+  --text-muted: #6E6A63;
+  --border-subtle: #D6D0C4;
+  --hw-border: #161615;
+  --hw-shadow: #161615;
+  --hw-inset-border: #C8C1B4;
+  --caution-red-a: #FEE2E2;
+  --caution-red-b: #FECACA;
+  --caution-amber-a: #FEF3C7;
+  --caution-amber-b: #FDE68A;
+}
+
+html.dark {
+  --bg-outer: #0D0C0B;
+  --bg-paper: #171614;
+  --bg-card: #211F1C;
+  --bg-recessed: #121110;
+  --text-ink: #F2EFE9;
+  --bg-charcoal: #1D1B18;
+  --text-muted: #9E988E;
+  --border-subtle: #35322D;
+  --hw-border: #090908;
+  --hw-shadow: #090908;
+  --hw-inset-border: #2E2B27;
+  --caution-red-a: #3B1815;
+  --caution-red-b: #4C1D19;
+  --caution-amber-a: #382810;
+  --caution-amber-b: #493414;
+}
+
+* {
+  -webkit-tap-highlight-color: transparent;
+  box-sizing: border-box;
+}
+
+body {
+  background-color: var(--bg-outer);
+  color: var(--text-ink);
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  overscroll-behavior-y: none;
+  margin: 0;
+  padding: 0;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+/* Ensure 16px minimum on all form controls to prevent iOS/Android focus auto-zoom */
+input, textarea, select {
+  font-size: 16px !important;
+}
+
+.tap-44 {
+  min-width: 44px;
+  min-height: 44px;
+}
+
+/* Hide scrollbars cleanly while keeping scrollability */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+@keyframes pulse-fast {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+
+.led-blink {
+  animation: pulse-fast 1.8s infinite ease-in-out;
+}
+
+@keyframes msg-highlight {
+  0% { box-shadow: 0 0 0 4px #D98200, 0 3px 0 var(--hw-shadow); }
+  100% { box-shadow: 0 0 0 0 rgba(217, 130, 0, 0), 0 3px 0 var(--hw-shadow); }
+}
+
+.highlight-pulse {
+  animation: msg-highlight 1.6s ease-out;
+}

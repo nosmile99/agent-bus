@@ -1,0 +1,99 @@
+/* Custom tactile shadows & borders */
+.hw-card {
+  background-color: var(--bg-card);
+  border: 1.5px solid var(--hw-border);
+  box-shadow: 0 3px 0 var(--hw-shadow);
+  transition: transform 0.08s ease, box-shadow 0.08s ease, background-color 0.15s ease;
+}
+
+html.dark .hw-card {
+  border-color: #3A3630;
+  box-shadow: 0 3px 0 #090908;
+}
+
+.hw-card-active:active {
+  transform: translateY(2px);
+  box-shadow: 0 1px 0 var(--hw-shadow);
+}
+
+.hw-card-subtle {
+  background-color: var(--bg-card);
+  border: 1.5px solid var(--border-subtle);
+  box-shadow: 0 2px 0 var(--border-subtle);
+}
+
+.hw-btn {
+  border: 1.5px solid var(--hw-border);
+  box-shadow: 0 2.5px 0 var(--hw-shadow);
+  transition: all 0.08s ease;
+}
+
+html.dark .hw-btn {
+  border-color: #3E3A34;
+  box-shadow: 0 2.5px 0 #080807;
+}
+
+.hw-btn:active {
+  transform: translateY(2px);
+  box-shadow: 0 0.5px 0 var(--hw-shadow);
+}
+
+.hw-inset {
+  background-color: var(--bg-recessed);
+  border: 1.5px solid var(--hw-inset-border);
+  box-shadow: inset 0 2px 3px rgba(0,0,0,0.12);
+}
+
+/* Diagonal caution stripe for blocked / stale */
+.caution-stripe-red {
+  background: repeating-linear-gradient(
+    -45deg,
+    var(--caution-red-a),
+    var(--caution-red-a) 8px,
+    var(--caution-red-b) 8px,
+    var(--caution-red-b) 16px
+  );
+}
+
+.caution-stripe-amber {
+  background: repeating-linear-gradient(
+    -45deg,
+    var(--caution-amber-a),
+    var(--caution-amber-a) 8px,
+    var(--caution-amber-b) 8px,
+    var(--caution-amber-b) 16px
+  );
+}
+
+/* Adapt hardcoded light utility pills in dark mode while keeping identical warm craft */
+html.dark .bg-stone-200 { background-color: #2C2925 !important; color: #E6E1D8 !important; border-color: #46413A !important; }
+html.dark .bg-stone-100 { background-color: #24221F !important; color: #A8A298 !important; }
+html.dark .bg-indigo-100 { background-color: #232544 !important; color: #E0E7FF !important; border-color: #5B63B7 !important; }
+html.dark .bg-emerald-100 { background-color: #143327 !important; color: #D1FAE5 !important; border-color: #2D7A5B !important; }
+html.dark .bg-amber-100, html.dark .bg-amber-200, html.dark .bg-amber-300 { background-color: #3D2B12 !important; color: #FDE68A !important; border-color: #926018 !important; }
+html.dark .bg-rose-100, html.dark .bg-rose-200, html.dark .bg-rose-50 { background-color: #3D1A1A !important; color: #FECDD3 !important; border-color: #9F2D2D !important; }
+
+/* Physical Swipe Track & Snap-back Transitions */
+.swipe-shell {
+  position: relative;
+  border-radius: 16px;
+  overflow: hidden;
+}
+
+.swipe-fg {
+  position: relative;
+  z-index: 2;
+  will-change: transform;
+  touch-action: pan-y;
+}
+
+.swipe-snap {
+  transition: transform 0.26s cubic-bezier(0.22, 1, 0.36, 1) !important;
+}
+
+.swipe-bg {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+}

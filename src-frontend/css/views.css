@@ -1,0 +1,8 @@
+/* View-specific styles */
+
+/* Kanban drop target active highlight */
+.kanban-drop-active {
+  outline: 2.5px dashed #1E6F50;
+  outline-offset: -2px;
+  background-color: rgba(30, 111, 80, 0.08) !important;
+}
