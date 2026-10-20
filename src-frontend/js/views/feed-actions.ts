@@ -9,8 +9,8 @@ import { getChannelMembers } from './feed.js';
  * BUS FEED ACTIONS & CHANNEL MANAGEMENT MODALS
  ********************************************************************/
 
-export async function sendOperatorMessage(e: Event): Promise<void> {
-  e.preventDefault();
+export async function sendOperatorMessage(e?: Event): Promise<void> {
+  if (e && e.preventDefault) e.preventDefault();
   const channelEl = document.getElementById('compose-channel') as HTMLSelectElement | null;
   const priorityEl = document.getElementById('compose-priority') as HTMLSelectElement | null;
   const audienceEl = document.getElementById('compose-audience') as HTMLSelectElement | null;
@@ -19,8 +19,12 @@ export async function sendOperatorMessage(e: Event): Promise<void> {
   const channel = channelEl ? channelEl.value : state.composerDraft.channel;
   const priority = priorityEl ? priorityEl.value : state.composerDraft.priority;
   const audience = audienceEl ? audienceEl.value : state.composerDraft.audience;
-  const body = bodyInput ? bodyInput.value.trim() : '';
-  if (!body) return;
+  const body = bodyInput ? bodyInput.value.trim() : (state.composerDraft.body || '').trim();
+  if (!body) {
+    showToast('Cannot send empty message', 'Please write something first', 'red');
+    if (bodyInput) bodyInput.focus();
+    return;
+  }
 
   const replyTo = state.composerDraft.reply_to || null;
   let newId: number | null = null;

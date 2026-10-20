@@ -32,15 +32,15 @@ export function renderKanbanView(): string {
 
   const allProjTasks = state.tasks.filter(t => t.project_id === currentProj.id);
   const filteredTasks = allProjTasks.filter(t => {
-    if (kf.status !== 'ALL' && t.status !== kf.status) return false;
-    if (kf.assignee !== 'ALL') {
+    if (kf.status && kf.status !== 'ALL' && t.status !== kf.status) return false;
+    if (kf.assignee && kf.assignee !== 'ALL') {
       if (kf.assignee === 'UNASSIGNED' && t.assignee !== null) return false;
       if (kf.assignee !== 'UNASSIGNED' && t.assignee !== kf.assignee) return false;
     }
-    if (kf.priority !== 'ALL' && t.priority !== kf.priority) return false;
-    if (kf.label !== 'ALL' && !(t.labels || []).includes(kf.label)) return false;
-    if (kf.blocked_kind !== 'ALL' && t.blocked_kind !== kf.blocked_kind) return false;
-    if (kf.q.trim() !== '') {
+    if (kf.priority && kf.priority !== 'ALL' && t.priority !== kf.priority) return false;
+    if (kf.label && kf.label !== 'ALL' && !(t.labels || []).includes(kf.label)) return false;
+    if (kf.blocked_kind && kf.blocked_kind !== 'ALL' && t.blocked_kind !== kf.blocked_kind) return false;
+    if (kf.q && kf.q.trim() !== '') {
       const needle = kf.q.trim().toLowerCase().replace(/[%_]/g, '');
       const hay = `${t.title || ''} ${t.description || ''}`.toLowerCase();
       if (!hay.includes(needle)) return false;

@@ -14,7 +14,7 @@ import { renderMessageCard, renderThreadTimeline } from './feed-card.js';
 
 export function getChannelMembers(channelName: string): string[] {
   let members = state.channelMembers[channelName];
-  if (!members) {
+  if (!members || members.length === 0) {
     if (channelName.startsWith('dm:')) {
       const parts = channelName.split(':');
       members = parts.slice(1);
@@ -72,10 +72,10 @@ export function renderMessagesView(): string {
   // Reverse-chronological social timeline
   const sortedMsgs = [...state.messages].sort((a, b) => b.id - a.id);
   const filteredMsgs = sortedMsgs.filter(m => {
-    if (mf.channel !== 'ALL' && m.channel !== mf.channel) return false;
-    if (mf.sender !== 'ALL' && m.sender !== mf.sender) return false;
-    if (mf.priority !== 'ALL' && m.priority !== mf.priority) return false;
-    if (mf.q.trim() !== '') {
+    if (mf.channel && mf.channel !== 'ALL' && m.channel !== mf.channel) return false;
+    if (mf.sender && mf.sender !== 'ALL' && m.sender !== mf.sender) return false;
+    if (mf.priority && mf.priority !== 'ALL' && m.priority !== mf.priority) return false;
+    if (mf.q && mf.q.trim() !== '') {
       const needle = mf.q.trim().toLowerCase().replace(/[%_]/g, '');
       if (!m.body.toLowerCase().includes(needle)) return false;
     }
@@ -351,6 +351,7 @@ export function renderMessagesView(): string {
               </button>
               <button
                 type="submit"
+                onclick="sendOperatorMessage(event)"
                 class="hw-btn tap-44 bg-ink text-paper font-mono text-xs font-bold px-5 rounded-xl flex items-center gap-1.5"
               >
                 <i class="ph-bold ph-paper-plane-right"></i>

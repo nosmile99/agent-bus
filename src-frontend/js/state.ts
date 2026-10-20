@@ -10,6 +10,9 @@ import type {
   FrontendAgent,
   FrontendProject,
   TaskStatus,
+  TaskPriority,
+  FrontendTodo,
+  FrontendComment,
 } from './types.js';
 
 /********************************************************************
@@ -127,6 +130,7 @@ export async function refreshTasks(): Promise<void> {
       description?: string | null;
       notes?: string | null;
       status: TaskStatus;
+      priority?: string;
       blocked_kind?: string | null;
       assignee?: string | null;
       claimed_at?: number | null;
@@ -137,6 +141,8 @@ export async function refreshTasks(): Promise<void> {
       updated_at: number;
       last_activity_at?: number | null;
       created_by?: string | null;
+      todos?: FrontendTodo[];
+      comments?: FrontendComment[];
     }>;
   }
   const data = await api.get<TasksListResponse>(`/admin/api/kanban/projects/${state.activeProjectId}/tasks`);
@@ -147,6 +153,7 @@ export async function refreshTasks(): Promise<void> {
     description: t.description || '',
     notes: t.notes || '',
     status: t.status,
+    priority: (t.priority as TaskPriority) || 'normal',
     blocked_kind: t.blocked_kind || null,
     assignee: t.assignee || null,
     claimed_at: t.claimed_at || null,
@@ -157,8 +164,8 @@ export async function refreshTasks(): Promise<void> {
     updated_at: t.updated_at,
     last_activity_at: t.last_activity_at,
     created_by: t.created_by || null,
-    todos: [],
-    comments: [], // lazy-loaded in drawer
+    todos: t.todos || [],
+    comments: t.comments || [],
   }));
 }
 
@@ -214,6 +221,7 @@ export async function loadAll(): Promise<void> {
       rate?: { used: number; limit: number; windowSec: number };
       transport?: 'ws' | 'poll';
       connected_since?: string | null;
+      connectedSince?: string | null;
       connections?: number;
       channels?: string[];
     }>;
@@ -253,11 +261,11 @@ export async function loadAll(): Promise<void> {
   state.agents = (agents.agents || []).map((a) => ({
     agent: a.agent,
     role: a.role || '',
-    created: a.created_at || a.created || '',
-    last_seen: a.last_seen,
+    created: a.created || a.created_at || '',
+    last_seen: a.last_seen || null,
     rate: a.rate || { used: 0, limit: 10, windowSec: 60 },
     transport: a.transport || 'poll',
-    connectedSince: a.connected_since || null,
+    connectedSince: a.connectedSince || a.connected_since || null,
     connections: a.connections || 0,
     channels: a.channels || ['all-agent'],
   }));
@@ -268,7 +276,13 @@ export async function loadAll(): Promise<void> {
     const name = typeof c === 'string' ? c : c.name || '';
     if (name) {
       channelList.push(name);
-      state.channelMembers[name] = typeof c === 'object' && c.members ? c.members : [];
+      const members =
+        typeof c === 'object' && Array.isArray(c.members) && c.members.length > 0
+          ? c.members
+          : name.startsWith('dm:')
+            ? name.split(':').slice(1)
+            : state.agents.map((a) => a.agent);
+      state.channelMembers[name] = members;
     }
   }
   state.channels = channelList;

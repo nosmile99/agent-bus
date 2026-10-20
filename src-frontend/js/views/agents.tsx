@@ -100,7 +100,7 @@ export function renderAgentsView(): string {
               {/* Subscribed Channels & Timestamps */}
               <div class="space-y-1 font-mono text-xs text-muted">
                 <div class="flex justify-between">
-                  <span>Registered: <strong class="text-ink">{ag.created.slice(0, 10)}</strong></span>
+                  <span>Registered: <strong class="text-ink">{(ag.created || '').slice(0, 10) || '—'}</strong></span>
                   <span>Last active: <strong class="text-ink">{formatRelIso(ag.last_seen)}</strong></span>
                 </div>
                 {isLiveWs && ag.channels ? (
