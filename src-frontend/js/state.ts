@@ -65,7 +65,7 @@ export const state: FrontendState = {
   activeProjectId: null,
   projects: [],
   tasks: [],
-  kanbanFilter: { q: '', label: 'ALL', assignee: 'ALL' },
+  kanbanFilter: { q: '', status: 'ALL', assignee: 'ALL', label: 'ALL', blocked_kind: 'ALL', priority: 'ALL', showFilters: false },
 
   // Unified poll cursor (composite ts + id)
   pollCursor: { ts: 0, id: 0 },

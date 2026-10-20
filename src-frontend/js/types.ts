@@ -118,6 +118,16 @@ export interface RawPollEvent {
   payload?: Record<string, unknown>;
 }
 
+export interface KanbanFilterState {
+  q: string;
+  status: string;
+  assignee: string;
+  label: string;
+  blocked_kind: string;
+  priority: string;
+  showFilters: boolean;
+}
+
 export interface FrontendState {
   activeTab: TabType;
   adminUser: string;
@@ -136,7 +146,7 @@ export interface FrontendState {
   activeProjectId: number | null;
   projects: FrontendProject[];
   tasks: FrontendTask[];
-  kanbanFilter: { q: string; label: string; assignee: string };
+  kanbanFilter: KanbanFilterState;
   pollCursor: { ts: number; id: number };
   retentionCutoffTs: number;
   resyncRequired: boolean;
