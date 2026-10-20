@@ -1,6 +1,17 @@
 // Unified-poll event emission & kanban event helpers
+import type { IBusDO, TaskRecord, TaskDetailResponse, TaskSearchOpts } from '../types.js';
 
-export function emitEvent(type, opts) {
+export function emitEvent(
+  this: IBusDO,
+  type: string,
+  opts?: {
+    actor?: string | null;
+    project_id?: number | null;
+    scope?: string;
+    recipients?: string[] | null;
+    payload?: unknown;
+  }
+): void {
   try {
     const o = opts || {};
     this.sql.exec(
@@ -13,12 +24,14 @@ export function emitEvent(type, opts) {
       o.recipients ? JSON.stringify(o.recipients) : null,
       JSON.stringify(o.payload || {})
     );
-  } catch (e) { /* swallow: primary write already succeeded */ }
+  } catch (_e) {
+    /* swallow: primary write already succeeded */
+  }
 }
 
 // Canonical subscriber predicate (byte-identical to kanban rev 4). ? = agent name.
 // projExpr = SQL expression for the project id in the outer query scope.
-export function kbSubscriberPred(projExpr = "project_id") {
+export function kbSubscriberPred(projExpr = "project_id"): string {
   return `${projExpr} IN (
     SELECT id FROM projects
     WHERE NOT EXISTS (SELECT 1 FROM project_subscribers ps WHERE ps.project_id = projects.id)
@@ -27,17 +40,21 @@ export function kbSubscriberPred(projExpr = "project_id") {
 }
 
 // True if the task's project is archived (agent writes 403, except comments).
-export function kbIsArchived(taskId) {
+export function kbIsArchived(this: IBusDO, taskId: number): boolean {
   try {
-    const r = this.sql.exec(
-      `SELECT p.archived FROM projects p JOIN tasks t ON t.project_id = p.id WHERE t.id = ?`, taskId
-    ).toArray()[0];
+    const rows = this.sql.exec(
+      `SELECT p.archived FROM projects p JOIN tasks t ON t.project_id = p.id WHERE t.id = ?`,
+      taskId
+    ).toArray() as Array<{ archived: number }>;
+    const r = rows[0];
     return !!(r && r.archived);
-  } catch { return false; }
+  } catch {
+    return false;
+  }
 }
 
 // Touch a task's activity timestamps (called on every task mutation).
-export function kbTouchTask(id) {
+export function kbTouchTask(this: IBusDO, id: number): void {
   try {
     const now = this.kbNow();
     this.sql.exec(`UPDATE tasks SET updated_at = ?, last_activity_at = ? WHERE id = ?`, now, now, id);
@@ -45,62 +62,86 @@ export function kbTouchTask(id) {
 }
 
 // Silent system activity log (author='system'). Emits NO poll event by design.
-export function kbSystemLog(taskId, body) {
+export function kbSystemLog(this: IBusDO, taskId: number, body: string): void {
   try {
     this.sql.exec(
       `INSERT INTO task_comments (task_id, author, body, ts) VALUES (?, 'system', ?, ?)`,
-      taskId, body, this.kbNow()
+      taskId,
+      body,
+      this.kbNow()
     );
   } catch {}
 }
 
 // Project subscribers (join table, NOT JSON).
-export function kbProjectSubscribers(projectId) {
+export function kbProjectSubscribers(this: IBusDO, projectId: number): string[] {
   try {
-    return this.sql.exec(`SELECT agent FROM project_subscribers WHERE project_id = ? ORDER BY agent`, projectId)
-      .toArray().map((r) => r.agent);
-  } catch { return []; }
+    return (
+      this.sql
+        .exec(`SELECT agent FROM project_subscribers WHERE project_id = ? ORDER BY agent`, projectId)
+        .toArray() as Array<{ agent: string }>
+    ).map((r) => r.agent);
+  } catch {
+    return [];
+  }
 }
 
 // Replace the subscriber set. Empty/absent array = open to all (no rows).
-export function kbSetSubscribers(projectId, subscribers, addedBy) {
+export function kbSetSubscribers(this: IBusDO, projectId: number, subscribers: unknown, addedBy?: string): string[] {
   this.sql.exec(`DELETE FROM project_subscribers WHERE project_id = ?`, projectId);
   if (!Array.isArray(subscribers) || subscribers.length === 0) return [];
   const now = this.kbNow();
-  const clean = [...new Set(subscribers.filter((s) => typeof s === "string" && s.trim()).map((s) => s.trim()))];
+  const clean = [
+    ...new Set(
+      subscribers
+        .filter((s): s is string => typeof s === "string" && s.trim().length > 0)
+        .map((s) => s.trim())
+    ),
+  ];
   for (const a of clean) {
     this.sql.exec(
       `INSERT OR IGNORE INTO project_subscribers (project_id, agent, added_by, added_at) VALUES (?, ?, ?, ?)`,
-      projectId, a, addedBy || "admin", now
+      projectId,
+      a,
+      addedBy || "admin",
+      now
     );
   }
   return clean;
 }
 
 // Task detail payload (kanban rev 4): labels, comment/activity counts, todos.
-export function kbTaskDetail(row) {
-  let labels = [];
+export function kbTaskDetail(this: IBusDO, row: TaskRecord): TaskDetailResponse {
+  let labels: string[] = [];
   let comment_count = 0;
   let activity_count = 0;
   try {
-    labels = this.sql.exec(`SELECT label FROM task_labels WHERE task_id = ? ORDER BY label`, row.id)
-      .toArray().map((r) => r.label);
-    comment_count = this.sql.exec(
-      `SELECT COUNT(*) AS c FROM task_comments WHERE task_id = ? AND author != 'system'`, row.id
-    ).one().c;
-    activity_count = this.sql.exec(
-      `SELECT COUNT(*) AS c FROM task_comments WHERE task_id = ?`, row.id
-    ).one().c;
+    labels = (
+      this.sql.exec(`SELECT label FROM task_labels WHERE task_id = ? ORDER BY label`, row.id).toArray() as Array<{
+        label: string;
+      }>
+    ).map((r) => r.label);
+    const commentCountRow = this.sql
+      .exec(`SELECT COUNT(*) AS c FROM task_comments WHERE task_id = ? AND author != 'system'`, row.id)
+      .one() as { c: number };
+    comment_count = commentCountRow.c;
+    const actCountRow = this.sql
+      .exec(`SELECT COUNT(*) AS c FROM task_comments WHERE task_id = ?`, row.id)
+      .one() as { c: number };
+    activity_count = actCountRow.c;
   } catch {}
   return { ...this.kbTaskWithTodos(row), labels, comment_count, activity_count };
 }
 
 // Shared task search builder. opts: {projectIds (array|null=all), q, status,
 // assignee, label, blocked_kind, sort, includeArchived, subscriberAgent}.
-// Returns {where, params} for "... FROM tasks WHERE <where>".
-export function kbTaskSearchWhere(opts) {
-  const conds = [];
-  const params = [];
+// Returns {where, params, order} for "... FROM tasks WHERE <where>".
+export function kbTaskSearchWhere(
+  this: IBusDO,
+  opts: TaskSearchOpts
+): { where: string; params: (string | number)[]; order: string } {
+  const conds: string[] = [];
+  const params: (string | number)[] = [];
   if (opts.projectIds && opts.projectIds.length) {
     conds.push(`tasks.project_id IN (${opts.projectIds.map(() => "?").join(",")})`);
     params.push(...opts.projectIds);

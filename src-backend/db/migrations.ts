@@ -1,9 +1,14 @@
 // Schema migrations for BusDO
 import { sha256Hex } from '../utils.js';
+import type { IBusDO } from '../types.js';
 
-export function migrateV3(bus) {
-  const addCol = (ddl) => {
-    try { bus.sql.exec(ddl); } catch (e) { /* column exists */ }
+export function migrateV3(bus: IBusDO): void {
+  const addCol = (ddl: string) => {
+    try {
+      bus.sql.exec(ddl);
+    } catch (_e) {
+      /* column exists */
+    }
   };
   addCol(`ALTER TABLE tasks ADD COLUMN blocked_kind TEXT CHECK (blocked_kind IN ('waiting-human','waiting-task','waiting-external'))`);
   addCol(`ALTER TABLE tasks ADD COLUMN status_changed_at INTEGER`);
@@ -40,11 +45,12 @@ export function migrateV3(bus) {
     `UPDATE tasks SET status_changed_at = COALESCE(updated_at, created_at, ?),
                       last_activity_at = COALESCE(updated_at, created_at, ?)
      WHERE status_changed_at IS NULL`,
-    now, now
+    now,
+    now
   );
 }
 
-export function migrateV4(bus) {
+export function migrateV4(bus: IBusDO): void {
   bus.sql.exec(`CREATE TABLE IF NOT EXISTS events (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     type TEXT NOT NULL,
@@ -69,27 +75,43 @@ export function migrateV4(bus) {
     added_at INTEGER NOT NULL,
     PRIMARY KEY (channel, agent)
   )`);
-  try { bus.sql.exec(`ALTER TABLE messages ADD COLUMN reply_to INTEGER`); } catch (e) { /* exists */ }
+  try {
+    bus.sql.exec(`ALTER TABLE messages ADD COLUMN reply_to INTEGER`);
+  } catch (_e) {
+    /* exists */
+  }
   // Backfill: seed all-agent; every registered agent becomes a member of
   // all-agent and of every pre-existing custom channel.
   const now = Math.floor(Date.now() / 1000);
-  bus.sql.exec(`INSERT OR IGNORE INTO channels (name, created_by, created_at) VALUES ('all-agent', 'system', ?)`, now);
+  bus.sql.exec(
+    `INSERT OR IGNORE INTO channels (name, created_by, created_at) VALUES ('all-agent', 'system', ?)`,
+    now
+  );
   const agents = bus.allAgents().map((a) => a.agent);
   for (const a of agents) {
-    bus.sql.exec(`INSERT OR IGNORE INTO channel_members (channel, agent, added_by, added_at) VALUES ('all-agent', ?, 'system', ?)`, a, now);
+    bus.sql.exec(
+      `INSERT OR IGNORE INTO channel_members (channel, agent, added_by, added_at) VALUES ('all-agent', ?, 'system', ?)`,
+      a,
+      now
+    );
   }
-  const chans = bus.sql.exec(
-    `SELECT DISTINCT channel FROM messages WHERE channel NOT LIKE 'dm:%' AND channel != 'all-agent'`
-  ).toArray();
+  const chans = bus.sql
+    .exec(`SELECT DISTINCT channel FROM messages WHERE channel NOT LIKE 'dm:%' AND channel != 'all-agent'`)
+    .toArray() as Array<{ channel: string }>;
   for (const { channel } of chans) {
     bus.sql.exec(`INSERT OR IGNORE INTO channels (name, created_by, created_at) VALUES (?, 'admin', ?)`, channel, now);
     for (const a of agents) {
-      bus.sql.exec(`INSERT OR IGNORE INTO channel_members (channel, agent, added_by, added_at) VALUES (?, ?, 'system', ?)`, channel, a, now);
+      bus.sql.exec(
+        `INSERT OR IGNORE INTO channel_members (channel, agent, added_by, added_at) VALUES (?, ?, 'system', ?)`,
+        channel,
+        a,
+        now
+      );
     }
   }
 }
 
-export async function runMigrations(bus) {
+export async function runMigrations(bus: IBusDO): Promise<void> {
   bus.sql.exec(`CREATE TABLE IF NOT EXISTS messages (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     sender TEXT NOT NULL,
@@ -112,10 +134,10 @@ export async function runMigrations(bus) {
     salt TEXT NOT NULL
   )`);
   // Seed from env on first boot if table empty.
-  const adminCount = bus.sql.exec(`SELECT COUNT(*) as c FROM admins`).one().c;
+  const adminCount = (bus.sql.exec(`SELECT COUNT(*) as c FROM admins`).one() as { c: number }).c;
   if (adminCount === 0) {
-    const envUser = bus.env.ADMIN_USER || "";
-    const envPass = bus.env.ADMIN_PASS || "";
+    const envUser = (bus.env.ADMIN_USER as string | undefined) || "";
+    const envPass = (bus.env.ADMIN_PASS as string | undefined) || "";
     if (envUser && envPass) {
       const salt = crypto.randomUUID();
       const hash = await sha256Hex(salt + ":" + envPass);
@@ -125,12 +147,10 @@ export async function runMigrations(bus) {
   // Migration: add last_seen column if missing.
   try {
     bus.sql.exec(`ALTER TABLE agents ADD COLUMN last_seen TEXT`);
-  } catch (e) {
+  } catch (_e) {
     // Column already exists — ignore.
   }
-  bus.sql.exec(
-    `CREATE INDEX IF NOT EXISTS idx_messages_channel_id ON messages(channel, id)`
-  );
+  bus.sql.exec(`CREATE INDEX IF NOT EXISTS idx_messages_channel_id ON messages(channel, id)`);
   // Kanban base (rev 2 plan, LOCKED 2026-10-19): projects -> tasks -> todos.
   // FK cascades require foreign_keys enforcement (per-connection pragma).
   bus.sql.exec(`PRAGMA foreign_keys = ON`);
@@ -162,17 +182,16 @@ export async function runMigrations(bus) {
     done INTEGER NOT NULL DEFAULT 0,
     sort_order INTEGER NOT NULL DEFAULT 0
   )`);
-  bus.sql.exec(
-    `CREATE INDEX IF NOT EXISTS idx_tasks_project_id ON tasks(project_id)`
-  );
-  bus.sql.exec(
-    `CREATE INDEX IF NOT EXISTS idx_todos_task_id ON todos(task_id)`
-  );
+  bus.sql.exec(`CREATE INDEX IF NOT EXISTS idx_tasks_project_id ON tasks(project_id)`);
+  bus.sql.exec(`CREATE INDEX IF NOT EXISTS idx_todos_task_id ON todos(task_id)`);
 
-  bus.sql.exec(`CREATE TABLE IF NOT EXISTS schema_migrations (version INTEGER PRIMARY KEY, applied_at INTEGER NOT NULL)`);
+  bus.sql.exec(
+    `CREATE TABLE IF NOT EXISTS schema_migrations (version INTEGER PRIMARY KEY, applied_at INTEGER NOT NULL)`
+  );
   let schemaV = 0;
   try {
-    schemaV = bus.sql.exec(`SELECT COALESCE(MAX(version), 0) AS v FROM schema_migrations`).one().v || 0;
+    const row = bus.sql.exec(`SELECT COALESCE(MAX(version), 0) AS v FROM schema_migrations`).one() as { v: number };
+    schemaV = row.v || 0;
   } catch {}
   const migNow = () => Math.floor(Date.now() / 1000);
   if (schemaV < 2) {
@@ -180,17 +199,21 @@ export async function runMigrations(bus) {
     schemaV = 2;
   }
   if (schemaV < 3) {
-    bus.migrateV3();
+    migrateV3(bus);
     bus.sql.exec(`INSERT INTO schema_migrations (version, applied_at) VALUES (3, ?)`, migNow());
     schemaV = 3;
   }
   if (schemaV < 4) {
-    bus.migrateV4();
+    migrateV4(bus);
     bus.sql.exec(`INSERT INTO schema_migrations (version, applied_at) VALUES (4, ?)`, migNow());
     schemaV = 4;
   }
   if (schemaV < 5) {
-    try { bus.sql.exec(`ALTER TABLE agents ADD COLUMN stale_notified_at TEXT`); } catch (e) { /* exists */ }
+    try {
+      bus.sql.exec(`ALTER TABLE agents ADD COLUMN stale_notified_at TEXT`);
+    } catch (_e) {
+      /* exists */
+    }
     bus.sql.exec(`INSERT INTO schema_migrations (version, applied_at) VALUES (5, ?)`, migNow());
     schemaV = 5;
   }
