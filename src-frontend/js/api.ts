@@ -1,4 +1,6 @@
-// Real Backend API Client (Basic auth, sessionStorage `busBasic`)
+// Real Backend API Client (hono/client hc, Basic auth, sessionStorage `busBasic`)
+import { hc } from 'hono/client';
+import type { AppType } from '../../src-backend/routes/index.js';
 
 export const busAuth = {
   get(): string | null {
@@ -11,6 +13,18 @@ export const busAuth = {
     sessionStorage.removeItem('busBasic');
   },
 };
+
+// Type-safe RPC client via hono/client
+export const client = hc<AppType>('/', {
+  fetch: (input: RequestInfo | URL, init?: RequestInit) => {
+    const headers = new Headers(init?.headers || {});
+    const auth = busAuth.get();
+    if (auth && !headers.has('Authorization')) {
+      headers.set('Authorization', 'Basic ' + auth);
+    }
+    return fetch(input, { ...init, headers });
+  },
+});
 
 export async function apiFetch(path: string, opts: RequestInit = {}): Promise<Response> {
   const res = await fetch(path, {
@@ -47,7 +61,9 @@ export const api = {
   post: <T = unknown>(p: string, b?: unknown): Promise<T> => apiReq<T>('POST', p, b || {}),
   put: <T = unknown>(p: string, b?: unknown): Promise<T> => apiReq<T>('PUT', p, b || {}),
   del: <T = unknown>(p: string): Promise<T> => apiReq<T>('DELETE', p),
+  hc: client,
 };
+
 
 export function showLogin(msg?: string): void {
   const ov = document.getElementById('loginOverlay');

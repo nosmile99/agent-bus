@@ -8,15 +8,14 @@ import { createAdminRouter } from './admin.js';
 import { createChannelsRouter } from './channels.js';
 import { createKanbanRouter } from './kanban.js';
 
-export function createRouter(bus: IBusDO): Hono {
-  const app = new Hono();
-
-  app.route('/', createPollRouter(bus));
-  app.route('/', createMessagesRouter(bus));
-  app.route('/', createAgentsRouter(bus));
-  app.route('/', createAdminRouter(bus));
-  app.route('/', createChannelsRouter(bus));
-  app.route('/', createKanbanRouter(bus));
+export function createRouter(bus: IBusDO) {
+  const app = new Hono()
+    .route('/', createPollRouter(bus))
+    .route('/', createMessagesRouter(bus))
+    .route('/', createAgentsRouter(bus))
+    .route('/', createAdminRouter(bus))
+    .route('/', createChannelsRouter(bus))
+    .route('/', createKanbanRouter(bus));
 
   app.notFound(() => bus.json(404, { error: 'not found' }));
   app.onError((err) =>
@@ -25,3 +24,6 @@ export function createRouter(bus: IBusDO): Hono {
 
   return app;
 }
+
+export type AppType = ReturnType<typeof createRouter>;
+
