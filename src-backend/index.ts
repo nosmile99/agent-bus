@@ -285,6 +285,13 @@ Object.assign(
   { handleAdminPanel }
 );
 
+// SAFEGUARD: Explicitly ensure critical handlers are on prototype (bundler may drop Object.assign)
+for (const [name, fn] of Object.entries(pollHandlers)) {
+  if (typeof fn === "function" && !(BusDO.prototype as any)[name]) {
+    (BusDO.prototype as any)[name] = fn;
+  }
+}
+
 export default {
   async fetch(req: Request, env: Env): Promise<Response> {
     const id = env.BUS.idFromName("bus");
