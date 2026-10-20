@@ -76,7 +76,9 @@ export async function checkBasicAuth(this: IBusDO, req: Request): Promise<boolea
   const u = decoded.slice(0, idx);
   const p = decoded.slice(idx + 1);
   // Look up in admins table.
-  const rows = this.sql.exec(`SELECT user, pass_hash, salt FROM admins WHERE user = ?`, u).toArray() as AdminRecord[];
+  const rows = this.sql
+    .exec(`SELECT user, pass_hash, salt FROM admins WHERE user = ?`, u)
+    .toArray() as unknown as AdminRecord[];
   if (rows.length === 0) return false;
   const row = rows[0]!;
   const hash = await sha256Hex(row.salt + ":" + p);

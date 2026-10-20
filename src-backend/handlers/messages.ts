@@ -158,8 +158,8 @@ export async function handleAdminExport(this: IBusDO, req: Request): Promise<Res
   if (!this.checkAdmin(req)) return this.json(401, { error: "unauthorized" });
   const messages = this.sql
     .exec("SELECT id, sender, channel, priority, audience, ts, body FROM messages ORDER BY id ASC")
-    .toArray() as MessageRecord[];
-  const agents = this.sql.exec("SELECT agent, created FROM agents").toArray() as AgentRecord[];
+    .toArray() as unknown as MessageRecord[];
+  const agents = this.sql.exec("SELECT agent, created FROM agents").toArray() as unknown as AgentRecord[];
   return this.json(200, { messages, agents });
 }
 
@@ -192,7 +192,7 @@ export async function handleAdminApiMessages(this: IBusDO, req: Request, url: UR
   }
   sql += " ORDER BY id DESC LIMIT ?";
   params.push(limit);
-  const messages = this.sql.exec(sql, ...params).toArray() as MessageRecord[];
+  const messages = this.sql.exec(sql, ...params).toArray() as unknown as MessageRecord[];
   return this.json(200, { messages });
 }
 

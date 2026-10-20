@@ -50,7 +50,7 @@ export async function handlePollNew(
         sinceTs,
         sinceId
       )
-      .toArray() as EventRecord[];
+      .toArray() as unknown as EventRecord[];
   } else {
     // Agent scoping (poll rev 3, normative combined filter).
     const safeAgent = agent || "";
@@ -77,7 +77,7 @@ export async function handlePollNew(
         ...readable, // channel IN (...)
         safeAgent // recipients json_each
       )
-      .toArray() as EventRecord[];
+      .toArray() as unknown as EventRecord[];
   }
   const events = rows.map((r) => {
     let data: unknown = {};
@@ -125,7 +125,7 @@ export async function handlePollLegacy(this: IBusDO, url: URL, agent: string): P
       since,
       ...chans
     )
-    .toArray() as MessageRecord[];
+    .toArray() as unknown as MessageRecord[];
   // Readiness-gated deprecation signal (non-breaking): header + field.
   return this.json(
     200,
@@ -149,7 +149,8 @@ export async function handleWs(this: IBusDO, req: Request, url: URL): Promise<Re
   if (!this.churnCheck(agent)) {
     // Spec §2.5: accept, deliver the churn error frame, then close.
     const pair = new WebSocketPair();
-    const [client, server] = Object.values(pair);
+    const client = pair[0];
+    const server = pair[1];
     this.state.acceptWebSocket(server);
     server.send(JSON.stringify({ op: "error", reason: "churn" }));
     server.close(1013, "churn");
@@ -168,7 +169,8 @@ export async function handleWs(this: IBusDO, req: Request, url: URL): Promise<Re
   const since = /^\d+$/.test(sinceRaw) ? parseInt(sinceRaw, 10) : 0;
 
   const pair = new WebSocketPair();
-  const [client, server] = Object.values(pair);
+  const client = pair[0];
+  const server = pair[1];
   // Tag with the full readable set (superset); the attachment carries the
   // effective subscription, which a later sub frame may narrow.
   this.state.acceptWebSocket(
@@ -225,7 +227,7 @@ export async function webSocketMessage(
     ws.send(JSON.stringify({ op: "error", reason: "no readable channels" }));
     return;
   }
-  let since = att.cursor || 0;
+  let since = att?.cursor || 0;
   if (data.since !== undefined && data.since !== null) {
     const s = String(data.since).trim();
     if (/^\d+$/.test(s)) since = parseInt(s, 10);

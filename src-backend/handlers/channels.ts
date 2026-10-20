@@ -226,7 +226,7 @@ export async function handleApiChannelMemberAdd(this: IBusDO, req: Request, name
     } catch {}
     return this.json(401, { error: "unauthorized" });
   }
-  const rows = this.sql.exec(`SELECT created_by FROM channels WHERE name = ?`, name).toArray() as ChannelRecord[];
+  const rows = this.sql.exec(`SELECT created_by FROM channels WHERE name = ?`, name).toArray() as unknown as ChannelRecord[];
   const chan = rows[0];
   if (!chan) return this.json(404, { error: "channel not found" });
   if (chan.created_by !== agent) {

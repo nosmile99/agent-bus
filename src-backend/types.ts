@@ -225,6 +225,24 @@ export interface IBusDO {
   kbNow(): number;
   kbBasicUser(req: Request): string;
 
+  kbChannelCreate(name: unknown, creator: string): { ok?: true; name?: string; error?: string; code: number };
+  kbChannelAddMember(
+    name: string,
+    agentName: string,
+    addedBy: string
+  ): { ok?: true; channel?: string; agent?: string; error?: string; code: number };
+  kbChannelRemoveMember(
+    name: string,
+    agentName: string,
+    removedBy: string
+  ): { ok?: true; channel?: string; agent?: string; error?: string; code: number };
+  kbLabelOp(
+    taskId: number,
+    label: unknown,
+    op: "add" | "remove",
+    actor: string
+  ): { ok?: true; error?: string; code: number };
+
   allAgents(): Array<{ agent: string; secret: string }>;
   authedAgent(req: Request): string | null;
   agentForToken(token: string): string | null;

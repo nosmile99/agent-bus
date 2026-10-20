@@ -191,7 +191,7 @@ export async function handleKbAgentProjectsList(this: IBusDO, req: Request): Pro
          FROM projects p WHERE p.archived = 0 AND ${this.kbSubscriberPred("p.id")} ORDER BY p.id DESC`,
         agent
       )
-      .toArray() as ProjectRecord[]
+      .toArray() as unknown as ProjectRecord[]
   ).map((p) => ({ ...p, subscribers: this.kbProjectSubscribers(p.id) }));
   return this.json(200, { projects });
 }

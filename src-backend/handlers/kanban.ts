@@ -11,7 +11,7 @@ export function kbTodosFor(this: IBusDO, taskId: number): TodoRecord[] {
       "SELECT id, task_id, text, done, sort_order FROM todos WHERE task_id = ? ORDER BY sort_order ASC, id ASC",
       taskId
     )
-    .toArray() as TodoRecord[];
+    .toArray() as unknown as TodoRecord[];
 }
 
 export function kbTaskWithTodos(this: IBusDO, row: TaskRecord): TaskWithTodos {
@@ -26,7 +26,7 @@ export async function handleKbAdminTasksList(this: IBusDO, req: Request, project
   const tasks = (
     this.sql
       .exec("SELECT * FROM tasks WHERE project_id = ? ORDER BY id ASC", projectId)
-      .toArray() as TaskRecord[]
+      .toArray() as unknown as TaskRecord[]
   ).map((t) => this.kbTaskWithTodos(t));
   return this.json(200, { tasks });
 }
@@ -86,7 +86,7 @@ export async function handleKbAdminTaskUpdate(this: IBusDO, req: Request, id: nu
     return this.json(400, { error: "invalid json" });
   }
   const payload = data as Record<string, unknown> | null;
-  const taskRows = this.sql.exec(`SELECT * FROM tasks WHERE id = ?`, id).toArray() as TaskRecord[];
+  const taskRows = this.sql.exec(`SELECT * FROM tasks WHERE id = ?`, id).toArray() as unknown as TaskRecord[];
   const task = taskRows[0];
   if (!task) return this.json(404, { error: "task not found" });
   const updates: string[] = [];
@@ -250,7 +250,7 @@ export async function handleKbAgentTasksList(this: IBusDO, req: Request, project
   const tasks = (
     this.sql
       .exec("SELECT * FROM tasks WHERE project_id = ? ORDER BY id ASC", projectId)
-      .toArray() as TaskRecord[]
+      .toArray() as unknown as TaskRecord[]
   ).map((t) => this.kbTaskWithTodos(t));
   return this.json(200, { tasks });
 }
@@ -327,7 +327,8 @@ export async function handleKbAgentTaskStatus(this: IBusDO, req: Request, id: nu
     return this.json(400, { error: "invalid json" });
   }
   const payload = data as Record<string, unknown> | null;
-  const status = payload?.status;
+  if (!payload) return this.json(400, { error: "invalid json" });
+  const status = payload.status;
   if (typeof status !== "string" || !["todo", "doing", "done", "blocked"].includes(status)) {
     return this.json(400, { error: "status must be one of todo/doing/done/blocked" });
   }

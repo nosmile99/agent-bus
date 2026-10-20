@@ -18,7 +18,7 @@ export async function handleKbAgentTaskDetail(this: IBusDO, req: Request, id: nu
       agent,
       agent
     )
-    .toArray() as TaskRecord[];
+    .toArray() as unknown as TaskRecord[];
   const row = rows[0];
   if (!row) return this.json(404, { error: "task not found" });
   return this.json(200, { task: this.kbTaskDetail(row) });
@@ -27,7 +27,7 @@ export async function handleKbAgentTaskDetail(this: IBusDO, req: Request, id: nu
 // GET /admin/api/kanban/tasks/:id — task detail (admin).
 export async function handleKbAdminTaskDetail(this: IBusDO, req: Request, id: number): Promise<Response> {
   if (!(await this.checkBasicAuth(req))) return this.unauthorizedBasic(req);
-  const rows = this.sql.exec(`SELECT * FROM tasks WHERE id = ?`, id).toArray() as TaskRecord[];
+  const rows = this.sql.exec(`SELECT * FROM tasks WHERE id = ?`, id).toArray() as unknown as TaskRecord[];
   const row = rows[0];
   if (!row) return this.json(404, { error: "task not found" });
   return this.json(200, { task: this.kbTaskDetail(row) });
@@ -214,7 +214,7 @@ export async function handleKbTaskSearch(
     subscriberAgent: isAdmin ? null : agent,
   });
   const tasks = (
-    this.sql.exec(`SELECT tasks.* FROM tasks WHERE ${where} ORDER BY ${order} LIMIT 200`, ...params).toArray() as TaskRecord[]
+    this.sql.exec(`SELECT tasks.* FROM tasks WHERE ${where} ORDER BY ${order} LIMIT 200`, ...params).toArray() as unknown as TaskRecord[]
   ).map((t) => this.kbTaskWithTodos(t));
   return this.json(200, { tasks });
 }
@@ -387,7 +387,7 @@ export async function handleKbCommentList(
   }
   const comments = this.sql
     .exec(`SELECT id, author, body, ts FROM task_comments WHERE task_id = ? ORDER BY ts ASC, id ASC`, taskId)
-    .toArray() as TaskCommentRecord[];
+    .toArray() as unknown as TaskCommentRecord[];
   return this.json(200, { comments });
 }
 
