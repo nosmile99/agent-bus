@@ -159,3 +159,10 @@ export function keepFieldAboveKeyboard(el: HTMLElement | null): void {
     el.scrollIntoView({ behavior: 'smooth', block: 'center' });
   }, 180);
 }
+
+export function applySwipeResistance(dx: number, maxFree = 70): number {
+  if (Math.abs(dx) <= maxFree) return dx;
+  const sign = Math.sign(dx);
+  const extra = Math.abs(dx) - maxFree;
+  return sign * (maxFree + extra * 0.35);
+}

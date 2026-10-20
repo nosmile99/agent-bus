@@ -64,6 +64,7 @@ export interface FrontendTask {
   description: string;
   notes: string;
   status: TaskStatus;
+  priority?: TaskPriority | string;
   blocked_kind: string | null;
   assignee: string | null;
   claimed_at: number | null;
@@ -130,7 +131,7 @@ export interface FrontendState {
   channels: string[];
   channelMembers: Record<string, string[]>;
   messages: FrontendMessage[];
-  msgFilter: { channel: string; sender: string; q: string };
+  msgFilter: { channel: string; sender: string; priority: string; q: string };
   activeProjectId: number | null;
   projects: FrontendProject[];
   tasks: FrontendTask[];

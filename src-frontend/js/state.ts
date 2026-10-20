@@ -61,7 +61,7 @@ export const state: FrontendState = {
   channels: [],
   channelMembers: {},
   messages: [],
-  msgFilter: { channel: 'ALL', sender: 'ALL', q: '' },
+  msgFilter: { channel: 'ALL', sender: 'ALL', priority: 'ALL', q: '' },
   activeProjectId: null,
   projects: [],
   tasks: [],
