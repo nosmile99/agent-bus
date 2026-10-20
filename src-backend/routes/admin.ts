@@ -1,4 +1,4 @@
-import { handleAdminPanel } from '../panel.js';
+import { handleAdminPanel, handleAdminAppJs, handleAdminCss } from '../panel.js';
 // Admin routes (panel, logout, stats, password) with Hono
 import { Hono } from 'hono';
 import type { IBusDO } from '../types.js';
@@ -10,6 +10,15 @@ export function createAdminRouter(bus: IBusDO): Hono {
   // /panel is a cache-busting alias for /admin (Ryuki 2026-10-17)
   router.get('/admin', (c) => handleAdminPanel(c.req.raw));
   router.get('/panel', (c) => handleAdminPanel(c.req.raw));
+
+  // Static assets for the modular frontend
+  router.get('/js/app.js', () => handleAdminAppJs());
+  router.get('/admin/js/app.js', () => handleAdminAppJs());
+  router.get('/panel/js/app.js', () => handleAdminAppJs());
+  router.get('/css/:file', (c) => handleAdminCss(c.req.param('file')));
+  router.get('/admin/css/:file', (c) => handleAdminCss(c.req.param('file')));
+  router.get('/panel/css/:file', (c) => handleAdminCss(c.req.param('file')));
+
 
   // /logout — static logged-out page (auth lives in panel JS sessionStorage).
   router.get('/logout', () => {
