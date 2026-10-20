@@ -23,14 +23,14 @@ import {
   horizScrolls,
   keepFieldAboveKeyboard,
   copyTokenText,
-  escapeHtml
+  escapeHtml,
+  applySwipeResistance
 } from './utils.js';
 
 // Views
 import { renderNeedsYouView } from './views/needs-you.js';
 import { renderKanbanView, scrollToKanbanColumn } from './views/kanban.js';
 import {
-  applySwipeResistance,
   openTaskDrawerIfNotSwiped,
   handleKanbanDragStart,
   handleKanbanDragOver,
@@ -118,30 +118,33 @@ import {
   executeRevokeAgent,
   toggleAgentTransport
 } from './views/agents.js';
+import { TabType } from './types.js';
 
 /********************************************************************
- * 4. NAVIGATION, THEME & SCROLL-PRESERVING VIEW RENDERER
+ * NAVIGATION, THEME & SCROLL-PRESERVING VIEW RENDERER
  ********************************************************************/
 
-export function initTheme() {
+export function initTheme(): void {
   try {
     const saved = localStorage.getItem('bus_op01_theme');
     state.darkMode = saved === 'dark';
-  } catch (e) {
+  } catch (_e) {
     state.darkMode = false;
   }
   applyThemeClass();
 }
 
-export function toggleDarkMode() {
+export function toggleDarkMode(): void {
   state.darkMode = !state.darkMode;
   try {
     localStorage.setItem('bus_op01_theme', state.darkMode ? 'dark' : 'light');
-  } catch (e) {}
+  } catch (_e) {
+    // Ignore localStorage errors
+  }
   applyThemeClass();
 }
 
-export function applyThemeClass() {
+export function applyThemeClass(): void {
   const root = document.documentElement;
   if (state.darkMode) {
     root.classList.add('dark');
@@ -161,7 +164,7 @@ export function applyThemeClass() {
   }
 }
 
-export function switchMainTab(tab) {
+export function switchMainTab(tab: TabType): void {
   const changed = state.activeTab !== tab;
   state.activeTab = tab;
   if (tab !== 'messages') {
@@ -175,8 +178,8 @@ export function switchMainTab(tab) {
   }
 }
 
-export function renderNavState() {
-  const tabs = ['messages', 'needs-you', 'kanban', 'agents'];
+export function renderNavState(): void {
+  const tabs: TabType[] = ['messages', 'needs-you', 'kanban', 'agents'];
   tabs.forEach(t => {
     const btn = document.getElementById(`nav-${t}`);
     if (!btn) return;
@@ -189,17 +192,20 @@ export function renderNavState() {
   updateHeaderTelemetry();
 }
 
-export function renderMainViewport(preserveScroll = true) {
+export function renderMainViewport(preserveScroll = true): void {
   const vp = document.getElementById('main-viewport');
   if (!vp) return;
 
   const prevTop = preserveScroll ? vp.scrollTop : 0;
   if (preserveScroll) {
     vp.querySelectorAll('[data-scroll-id]').forEach(el => {
-      horizScrolls[el.getAttribute('data-scroll-id')] = {
-        left: el.scrollLeft,
-        top: el.scrollTop
-      };
+      const scrollId = el.getAttribute('data-scroll-id');
+      if (scrollId) {
+        horizScrolls[scrollId] = {
+          left: el.scrollLeft,
+          top: el.scrollTop
+        };
+      }
     });
   }
 
@@ -217,17 +223,20 @@ export function renderMainViewport(preserveScroll = true) {
   if (preserveScroll) {
     vp.scrollTop = prevTop;
     vp.querySelectorAll('[data-scroll-id]').forEach(el => {
-      const saved = horizScrolls[el.getAttribute('data-scroll-id')];
-      if (saved) {
-        el.scrollLeft = saved.left;
-        el.scrollTop = saved.top;
+      const scrollId = el.getAttribute('data-scroll-id');
+      if (scrollId) {
+        const saved = horizScrolls[scrollId];
+        if (saved) {
+          el.scrollLeft = saved.left;
+          el.scrollTop = saved.top;
+        }
       }
     });
   }
 }
 
 // Wire login success handler
-setLoginSuccessHandler(async (user) => {
+setLoginSuccessHandler(async (user: string) => {
   await loadAll();
   state.adminUser = user;
   renderNavState();

@@ -15,6 +15,10 @@ export function getNowEpoch(): number {
   return NOW_EPOCH;
 }
 
+export function setNowEpoch(val: number): void {
+  NOW_EPOCH = val;
+}
+
 export function nowIso(): string {
   return new Date(NOW_EPOCH * 1000).toISOString();
 }
@@ -151,7 +155,7 @@ export function copyTokenText(text: string): void {
   showToast('Copied to clipboard', text.slice(0, 36) + (text.length > 36 ? '…' : ''), 'green');
 }
 
-export const horizScrolls: Record<string, number> = {};
+export const horizScrolls: Record<string, { left: number; top: number }> = {};
 
 export function keepFieldAboveKeyboard(el: HTMLElement | null): void {
   if (!el) return;
