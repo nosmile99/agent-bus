@@ -1,4 +1,5 @@
 // Unified poll (rev 3), legacy poll, and WebSocket handlers
+import { authedAgent } from "./agents.js";
 import type { IBusDO, EventRecord, MessageRecord } from '../types.js';
 
 interface WebSocketAttachmentData {
@@ -15,7 +16,7 @@ export async function handlePoll(this: IBusDO, req: Request, url: URL): Promise<
     if (!(await this.checkBasicAuth(req))) return this.unauthorizedBasic(req);
     return this.handlePollNew(url, null, true);
   }
-  const agent = this.authedAgent(req);
+  const agent = authedAgent.call(this, req);
   if (!agent) return this.json(401, { error: "unauthorized" });
   if (sinceTsRaw !== null) return this.handlePollNew(url, agent, false);
   return this.handlePollLegacy(url, agent);
