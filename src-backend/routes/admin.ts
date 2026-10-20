@@ -1,3 +1,4 @@
+import { handleAdminPanel } from '../panel.js';
 // Admin routes (panel, logout, stats, password) with Hono
 import { Hono } from 'hono';
 import type { IBusDO } from '../types.js';
@@ -7,8 +8,8 @@ export function createAdminRouter(bus: IBusDO): Hono {
 
   // Admin panel (Ryuki #268, Basic auth, separate realm)
   // /panel is a cache-busting alias for /admin (Ryuki 2026-10-17)
-  router.get('/admin', (c) => bus.handleAdminPanel(c.req.raw));
-  router.get('/panel', (c) => bus.handleAdminPanel(c.req.raw));
+  router.get('/admin', (c) => handleAdminPanel(c.req.raw));
+  router.get('/panel', (c) => handleAdminPanel(c.req.raw));
 
   // /logout — static logged-out page (auth lives in panel JS sessionStorage).
   router.get('/logout', () => {
