@@ -229,6 +229,11 @@ export interface IBusDO {
   authedAgent(req: Request): string | null;
   agentForToken(token: string): string | null;
   readableChannels(agent: string): Set<string>;
+  validateChannel(agent: string, channel: string | null | undefined): string | null;
+  rlCheck(agent: string): boolean;
+  churnCheck(agent: string): boolean;
+  ensureChannelRow(channel: string, sender: string): string;
+  canSendToChannel(agent: string, channel: string): boolean;
 
   checkAdmin(req: Request): boolean;
   checkAdminDrain(req: Request): Promise<boolean>;
@@ -237,6 +242,11 @@ export interface IBusDO {
 
   handleWs(req: Request, url: URL): Promise<Response>;
   handlePoll(req: Request, url: URL): Promise<Response>;
+  handlePollNew(url: URL, agent: string | null, isAdmin: boolean): Promise<Response>;
+  handlePollLegacy(url: URL, agent: string): Promise<Response>;
+  webSocketMessage(ws: WebSocket, message: string | ArrayBuffer): Promise<void>;
+  webSocketClose(ws: WebSocket, code: number, reason: string, wasClean: boolean): Promise<void>;
+  webSocketError(ws: WebSocket, error: unknown): Promise<void>;
   handleSend(req: Request): Promise<Response>;
   handleAdminImport(req: Request): Promise<Response>;
   handleAdminExport(req: Request): Promise<Response>;

@@ -110,10 +110,7 @@ export async function handlePollLegacy(this: IBusDO, url: URL, agent: string): P
   const channel = url.searchParams.get("channel");
   let chans: string[];
   if (channel) {
-    const err = (this as unknown as { validateChannel(a: string, c: string): string | null }).validateChannel(
-      agent,
-      channel
-    );
+    const err = this.validateChannel(agent, channel);
     if (err) return this.json(403, { error: "channel not readable: " + err });
     if (!readable.has(channel)) return this.json(403, { error: "channel not readable: not a member" });
     chans = [channel];
@@ -149,7 +146,7 @@ export async function handleWs(this: IBusDO, req: Request, url: URL): Promise<Re
   if (!agent) {
     return new Response("unauthorized", { status: 401 });
   }
-  if (!((this as unknown as { churnCheck(a: string): boolean }).churnCheck(agent))) {
+  if (!this.churnCheck(agent)) {
     // Spec §2.5: accept, deliver the churn error frame, then close.
     const pair = new WebSocketPair();
     const [client, server] = Object.values(pair);
@@ -162,11 +159,10 @@ export async function handleWs(this: IBusDO, req: Request, url: URL): Promise<Re
   const readable = this.readableChannels(agent);
   // Optional initial subscription via query params; the sub frame can
   // re-tag later. Intersection with the readable set is enforced.
-  const validateChan = (this as unknown as { validateChannel(a: string, c: string): string | null }).validateChannel.bind(this);
   const qChans = (url.searchParams.get("channels") || "")
     .split(",")
     .map((s) => s.trim())
-    .filter((c) => c && readable.has(c) && !validateChan(agent, c));
+    .filter((c) => c && readable.has(c) && !this.validateChannel(agent, c));
   const initialChannels = qChans.length ? qChans : [...readable];
   const sinceRaw = (url.searchParams.get("since") || "0").trim();
   const since = /^\d+$/.test(sinceRaw) ? parseInt(sinceRaw, 10) : 0;
@@ -221,10 +217,9 @@ export async function webSocketMessage(
   }
   const readable = this.readableChannels(agent);
   const requested = Array.isArray(data.channels) ? data.channels : [];
-  const validateChan = (this as unknown as { validateChannel(a: string, c: string): string | null }).validateChannel.bind(this);
   // Server re-checks every sub frame: only readable channels survive (spec §8).
   const channels = requested.filter(
-    (c): c is string => typeof c === "string" && readable.has(c) && !validateChan(agent, c)
+    (c): c is string => typeof c === "string" && readable.has(c) && !this.validateChannel(agent, c)
   );
   if (!channels.length) {
     ws.send(JSON.stringify({ op: "error", reason: "no readable channels" }));
