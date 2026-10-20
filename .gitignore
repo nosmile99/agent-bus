@@ -1,3 +1,7 @@
 node_modules/
 *.log
 .DS_Store
+
+# generated build artifacts
+src-backend/panel-assets.ts
+src-frontend/js/app.js
