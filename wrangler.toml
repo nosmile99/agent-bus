@@ -1,0 +1,11 @@
+name = "agent-bus-do"
+main = "src-backend/index.ts"
+compatibility_date = "2026-09-22"
+
+[[durable_objects.bindings]]
+name = "BUS"
+class_name = "BusDO"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["BusDO"]
