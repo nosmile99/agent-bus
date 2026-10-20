@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Agent Bus — Operator Console</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,600;0,9..144,700;1,9..144,600&family=IBM+Plex+Mono:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://unpkg.com/@phosphor-icons/web"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            paper: 'var(--bg-paper)',
+            card: 'var(--bg-card)',
+            recessed: 'var(--bg-recessed)',
+            ink: 'var(--text-ink)',
+            charcoal: 'var(--bg-charcoal)',
+            muted: 'var(--text-muted)',
+            border: 'var(--border-subtle)',
+            vermilion: '#E03E1A',
+            ochre: '#D98200',
+            forest: '#1E6F50',
+            cobalt: '#1D4ED8',
+            plum: '#6D28D9'
+          },
+          fontFamily: {
+            serif: ['"Fraunces"', 'serif'],
+            sans: ['"Plus Jakarta Sans"', 'sans-serif'],
+            mono: ['"IBM Plex Mono"', 'monospace'],
+          }
+        }
+      }
+    }
+  </script>
+  <link rel="stylesheet" href="css/main.css" />
+  <link rel="stylesheet" href="css/components.css" />
+  <link rel="stylesheet" href="css/views.css" />
+</head>
+<body class="min-h-screen flex justify-center items-start sm:py-4">
+
+  <!-- LOGIN OVERLAY (real backend auth) -->
+  <div id="loginOverlay" class="fixed inset-0 z-50 hidden items-center justify-center bg-ink/70 backdrop-blur-sm p-4">
+    <form onsubmit="handleLogin(event)" class="w-full max-w-[340px] bg-paper rounded-2xl p-6 space-y-4 border-2 border-ink">
+      <div>
+        <div class="font-mono text-xs font-bold uppercase text-muted">Agent Bus</div>
+        <h2 class="font-serif font-bold text-xl text-ink">Operator Sign In</h2>
+      </div>
+      <div id="loginError" class="hidden text-sm font-mono text-red-700 bg-red-50 border border-red-200 rounded-xl px-3 py-2"></div>
+      <input id="loginUser" type="text" autocomplete="username" placeholder="Username" class="tap-44 w-full hw-inset rounded-xl px-3 py-2.5 font-mono text-ink" />
+      <input id="loginPass" type="password" autocomplete="current-password" placeholder="Password" class="tap-44 w-full hw-inset rounded-xl px-3 py-2.5 font-mono text-ink" />
+      <button id="loginBtn" type="submit" class="hw-btn tap-44 w-full bg-ink text-paper font-mono text-sm font-bold py-3 rounded-xl">Sign in</button>
+    </form>
+  </div>
+
+  <!-- MOBILE HARDWARE CHASSIS (360px - 430px optimal, pinned viewport height so top/bottom bars stay sticky while scrolling) -->
+  <div id="app-chassis" class="w-full max-w-[430px] h-[100dvh] sm:h-[880px] bg-paper sm:rounded-[28px] sm:border-[3px] sm:border-ink sm:shadow-[0_16px_40px_rgba(0,0,0,0.28)] flex flex-col relative overflow-hidden">
+
+    <!-- SLIM SINGLE-ROW HARDWARE HEADER -->
+    <header class="sticky top-0 bg-[#262523] text-[#F4F1EA] px-3 py-1.5 border-b-2 border-[#161615] select-none shrink-0 z-20 flex items-center justify-between gap-2 min-h-[54px]">
+      <div class="flex items-center gap-2 min-w-0">
+        <span class="w-2.5 h-2.5 rounded-full bg-emerald-400 led-blink shadow-[0_0_8px_#34d399] shrink-0"></span>
+        <div class="truncate">
+          <span class="font-serif text-base font-bold tracking-tight text-[#F4F1EA]">Agent Bus</span>
+          <span id="header-ws-pill" class="ml-1.5 font-mono text-[11px] bg-black/45 text-emerald-300 px-2 py-0.5 rounded-md border border-white/15">2/3 live</span>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-1.5 shrink-0">
+        <!-- Dark Mode Hardware Toggle in Header -->
+        <button onclick="toggleDarkMode()" id="header-theme-toggle" class="tap-44 px-3 rounded-xl bg-black/50 hover:bg-black text-[#F4F1EA] border border-white/15 flex items-center justify-center gap-1.5 active:scale-95 transition" title="Switch appearance">
+          <i id="theme-toggle-icon" class="ph-bold ph-moon text-lg"></i>
+          <span id="theme-toggle-label" class="font-mono text-xs font-bold">Dark</span>
+        </button>
+
+        <!-- Operator Settings & Activity Tools -->
+        <button onclick="openAdminModal()" class="tap-44 w-11 rounded-xl bg-black/50 text-[#F4F1EA]/90 hover:text-white border border-white/15 flex items-center justify-center active:scale-95 transition" title="Operator settings & tools">
+          <i class="ph-bold ph-sliders-horizontal text-lg"></i>
+        </button>
+      </div>
+    </header>
+
+    <!-- MAIN SCROLLABLE WORKSPACE -->
+    <main id="main-viewport" class="flex-1 overflow-y-auto overflow-x-hidden pb-6 flex flex-col relative">
+      <!-- Views dynamically rendered here -->
+    </main>
+
+    <!-- STICKY BOTTOM TACTILE NAVIGATION DECK (4 Content Tabs) -->
+    <nav class="sticky bottom-0 bg-card border-t-2 border-ink px-2 py-1.5 grid grid-cols-4 gap-1.5 shrink-0 z-30 shadow-[0_-4px_12px_rgba(0,0,0,0.08)]">
+      <button onclick="switchMainTab('messages')" id="nav-messages" class="tap-44 flex flex-col items-center justify-center py-1.5 px-1 rounded-xl relative transition">
+        <div class="relative flex items-center justify-center">
+          <i class="ph-bold ph-chats-teardrop text-xl"></i>
+          <span id="nav-msg-badge" class="absolute -top-1.5 -right-4 bg-ink text-paper font-mono text-[10px] font-bold px-1.5 py-0.2 rounded-full border border-paper">10</span>
+        </div>
+        <span class="font-mono text-[11px] font-bold tracking-tight mt-0.5">Bus Feed</span>
+      </button>
+
+      <button onclick="switchMainTab('needs-you')" id="nav-needs-you" class="tap-44 flex flex-col items-center justify-center py-1.5 px-1 rounded-xl relative transition">
+        <div class="relative flex items-center justify-center">
+          <i class="ph-bold ph-hand-palm text-xl"></i>
+          <span id="nav-needs-badge" class="absolute -top-1.5 -right-3.5 bg-vermilion text-white font-mono text-[10px] font-bold px-1.5 py-0.2 rounded-full border border-ink shadow-sm">3</span>
+        </div>
+        <span class="font-mono text-[11px] font-bold tracking-tight mt-0.5">Needs You</span>
+      </button>
+
+      <button onclick="switchMainTab('kanban')" id="nav-kanban" class="tap-44 flex flex-col items-center justify-center py-1.5 px-1 rounded-xl relative transition">
+        <i class="ph-bold ph-kanban text-xl"></i>
+        <span class="font-mono text-[11px] font-bold tracking-tight mt-0.5">Kanban</span>
+      </button>
+
+      <button onclick="switchMainTab('agents')" id="nav-agents" class="tap-44 flex flex-col items-center justify-center py-1.5 px-1 rounded-xl relative transition">
+        <i class="ph-bold ph-cpu text-xl"></i>
+        <span class="font-mono text-[11px] font-bold tracking-tight mt-0.5">Agents</span>
+      </button>
+    </nav>
+
+    <!-- SLIDE-OVER / BOTTOM SHEET OVERLAY CONTAINER -->
+    <div id="modal-backdrop" onclick="closeTopModal(event)" class="fixed inset-0 bg-ink/60 backdrop-blur-[1px] z-40 hidden items-end sm:items-center justify-center">
+      <div id="modal-sheet" onclick="event.stopPropagation()" class="w-full max-w-[430px] bg-paper border-t-2 sm:border-2 border-ink rounded-t-[24px] sm:rounded-[22px] max-h-[92dvh] flex flex-col overflow-hidden shadow-2xl">
+        <!-- Dynamic modal content -->
+      </div>
+    </div>
+
+    <!-- FULL-HEIGHT SINGLE-SCROLL TASK DOCUMENT DRAWER -->
+    <div id="task-drawer" class="fixed inset-0 z-30 hidden flex-col items-center justify-end sm:justify-center bg-ink/50 backdrop-blur-[1px]">
+      <div id="task-drawer-inner" class="w-full max-w-[430px] h-[96dvh] sm:h-[88vh] bg-paper border-t-2 sm:border-2 border-ink rounded-t-[24px] sm:rounded-[24px] flex flex-col overflow-hidden shadow-2xl">
+        <!-- Populated when inspecting/editing a task document -->
+      </div>
+    </div>
+
+    <!-- TOAST STACK -->
+    <div id="toast-container" class="fixed top-16 left-1/2 -translate-x-1/2 w-[92%] max-w-[390px] z-50 pointer-events-none flex flex-col gap-2"></div>
+
+  </div>
+
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>
