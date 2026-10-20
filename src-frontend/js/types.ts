@@ -67,6 +67,7 @@ export interface FrontendTask {
   priority?: TaskPriority | string;
   blocked_kind: string | null;
   assignee: string | null;
+  admin_assigned?: string | number | boolean | null;
   claimed_at: number | null;
   labels: string[];
   comment_count: number;
