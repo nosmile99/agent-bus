@@ -36,6 +36,13 @@ export class BusDO implements IBusDO {
     this.rateLimit = new Map<string, number[]>();
     this.churn = new Map<string, number[]>();
     this.app = createRouter(this);
+    for (const mod of [eventMethods, agentHandlers, channelHandlers, messageHandlers, pollHandlers, adminHandlers, kanbanHandlers]) {
+      for (const [name, fn] of Object.entries(mod)) {
+        if (typeof fn === 'function' && !(this as any)[name]) {
+          (this as any)[name] = (fn as Function).bind(this);
+        }
+      }
+    }
 
     this.state.blockConcurrencyWhile(async () => {
       await runMigrations(this);
