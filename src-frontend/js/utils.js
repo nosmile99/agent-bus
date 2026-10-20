@@ -1,3 +1,5 @@
+import { showToast } from './components/toast.js';
+
 /********************************************************************
  * TIME, CONSTANTS & HELPER UTILITIES
  ********************************************************************/
@@ -131,6 +133,16 @@ export function emitPollEvent(typeLabel, projectId, summaryText, forceAdminOnly 
 
 export function getUserCommentCount(task) {
   return (task.comments || []).filter(c => c.author !== 'system').length;
+}
+
+export function copyTokenText(text) {
+  const ta = document.createElement('textarea');
+  ta.value = text;
+  document.body.appendChild(ta);
+  ta.select();
+  document.execCommand('copy');
+  ta.remove();
+  showToast('Copied to clipboard', text.slice(0, 36) + (text.length > 36 ? '…' : ''), 'green');
 }
 
 export const horizScrolls = {};
