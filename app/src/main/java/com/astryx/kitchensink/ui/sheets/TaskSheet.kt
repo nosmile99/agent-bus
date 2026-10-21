@@ -1,5 +1,6 @@
 package com.astryx.kitchensink.ui.sheets
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
@@ -64,9 +65,9 @@ private val dueOptions = listOf("No due date", "Today", "Tomorrow", "This week",
 
 /**
  * Task detail sheet: 24dp top radius, ~94% height, charcoal header.
- * Title / summary / notes are DRAFT fields — they persist on Save or Close.
- * Status, assignee, priority, due, and the checklist apply immediately,
- * mirroring the web prototype.
+ * Title / summary / notes are DRAFT fields — they persist when the sheet
+ * closes (header ✕, scrim, or system Back). There is no save button: every
+ * other field applies immediately, mirroring the web prototype.
  */
 @Composable
 fun TaskSheet(
@@ -105,6 +106,17 @@ fun TaskSheet(
             delay(300)
             after()
             onClose()
+        }
+    }
+
+    // System Back: cancels the delete confirmation first; otherwise it is
+    // the same persist-and-dismiss path as the header ✕.
+    BackHandler {
+        if (confirmDelete) {
+            confirmDelete = false
+        } else {
+            persistDrafts()
+            dismiss()
         }
     }
 
@@ -160,10 +172,6 @@ fun TaskSheet(
                 Op01Badge("Task #${task.num}", colors.charcoalText.copy(alpha = 0.16f), colors.charcoalText)
                 Column(Modifier.weight(1f)) {
                     HwText(task.project, Op01Theme.type.labelLg, colors.charcoalText, maxLines = 1)
-                    HwText(
-                        "Status: ${task.status.label}", Op01Theme.type.bodySm,
-                        colors.charcoalText.copy(alpha = 0.75f), maxLines = 1,
-                    )
                 }
                 HwButton(
                     "Delete",
@@ -215,6 +223,16 @@ fun TaskSheet(
                         },
                         modifier = Modifier.fillMaxWidth(),
                     )
+                    if (task.status == TaskStatus.Blocked) {
+                        HwSelect(
+                            label = "Blocked reason",
+                            value = task.blockedReason.ifEmpty { "Waiting on another task" },
+                            options = listOf("Waiting on me", "Waiting on another task"),
+                            onSelect = { reason ->
+                                state.updateTask(task.id) { it.copy(blockedReason = reason) }
+                            },
+                        )
+                    }
                 }
                 // Assignment
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -237,9 +255,21 @@ fun TaskSheet(
                         },
                     )
                     FieldLabel("Due")
+                    // "No due date" is the empty string in the model; a stored
+                    // value outside the presets (e.g. "In 4h") joins the row so
+                    // it still renders as the selected option.
+                    val dueRowOptions = if (task.due.isNotEmpty() && task.due !in dueOptions) {
+                        dueOptions + task.due
+                    } else {
+                        dueOptions
+                    }
                     Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        dueOptions.forEach { option ->
-                            val selected = task.due == option
+                        dueRowOptions.forEach { option ->
+                            val selected = if (option == "No due date") {
+                                task.due.isEmpty()
+                            } else {
+                                task.due == option
+                            }
                             val animBg by animateOp01Color(if (selected) colors.ink else colors.recessed, "due-bg")
                             val animFg by animateOp01Color(if (selected) colors.paper else colors.secondary, "due-fg")
                             val animBorder by animateOp01Color(if (selected) colors.borderHardware else colors.borderInset, "due-border")
@@ -255,7 +285,9 @@ fun TaskSheet(
                                     .background(animBg, shape)
                                     .border(1.5.dp, animBorder, shape)
                                     .clickable {
-                                        state.updateTask(task.id) { it.copy(due = option) }
+                                        state.updateTask(task.id) {
+                                            it.copy(due = if (option == "No due date") "" else option)
+                                        }
                                     }
                                     .heightIn(min = 44.dp)
                                     .padding(horizontal = 8.dp, vertical = 8.dp),
@@ -358,28 +390,6 @@ fun TaskSheet(
                             }
                         }
                     }
-                }
-                // Save bar
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    HwButton(
-                        "Close",
-                        onClick = {
-                            persistDrafts()
-                            dismiss()
-                        },
-                        style = HwButtonStyle.Secondary,
-                        modifier = Modifier.weight(1f),
-                    )
-                    HwButton(
-                        "Save changes",
-                        onClick = {
-                            persistDrafts()
-                            onToast("Saved — Task #${task.num}.")
-                            dismiss()
-                        },
-                        style = HwButtonStyle.Primary,
-                        modifier = Modifier.weight(1f),
-                    )
                 }
             }
         }
