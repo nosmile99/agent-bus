@@ -41,7 +41,6 @@ import com.astryx.kitchensink.theme.Op01Radius
 import com.astryx.kitchensink.theme.Op01Space
 import com.astryx.kitchensink.theme.Op01Theme
 import com.astryx.kitchensink.ui.components.HwText
-import com.astryx.kitchensink.ui.components.LedDot
 import com.astryx.kitchensink.ui.components.Op01Motion
 import com.astryx.kitchensink.ui.components.animateOp01Color
 import com.astryx.kitchensink.ui.components.hardShadow
@@ -95,10 +94,10 @@ fun Op01App(
     ) {
         Column(Modifier.fillMaxSize()) {
             AppHeader(
-                transportLive = state.transportLive,
+                resync = state.resync,
+                liveCount = state.liveSocketCount(),
                 darkTheme = darkTheme,
                 onToggleTheme = onToggleTheme,
-                onSettings = { toast = "Settings live on the panel — this console is dispatch-only." },
             )
             Box(
                 modifier = Modifier
@@ -152,7 +151,6 @@ fun Op01App(
             }
             BottomNav(
                 current = tab,
-                feedCount = state.messages.size,
                 needsCount = state.needsTasks().size,
                 onSelect = { tab = it },
             )
@@ -192,10 +190,10 @@ fun Op01App(
 
 @Composable
 private fun AppHeader(
-    transportLive: Boolean,
+    resync: Boolean,
+    liveCount: Int,
     darkTheme: Boolean,
     onToggleTheme: () -> Unit,
-    onSettings: () -> Unit,
 ) {
     val colors = Op01Theme.colors
     Row(
@@ -208,12 +206,17 @@ private fun AppHeader(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        LedDot()
         Column(Modifier.weight(1f)) {
             HwText("Agent Bus", Op01Theme.type.headlineSm, colors.charcoalText, maxLines = 1)
             HwText("BUS // OP-01", Op01Theme.type.labelCaps, colors.charcoalText.copy(alpha = 0.7f), maxLines = 1)
         }
-        // Live pill: recessed charcoal inset with LED + mono label.
+        // Status pill: the single status cluster. A pending resync outranks
+        // the transport state; otherwise it reports live-socket agents.
+        val (pillDot, pillLabel) = when {
+            resync -> colors.vermilion to "RESYNC"
+            liveCount > 0 -> colors.led to "$liveCount/3 LIVE"
+            else -> colors.ochre to "POLLING"
+        }
         Row(
             modifier = Modifier
                 .background(colors.paper.copy(alpha = 0.08f), RoundedCornerShape(Op01Radius.full))
@@ -225,16 +228,15 @@ private fun AppHeader(
             Box(
                 Modifier
                     .size(7.dp)
-                    .background(if (transportLive) colors.led else colors.ochre, CircleShape),
+                    .background(pillDot, CircleShape),
             )
             HwText(
-                if (transportLive) "2/3 LIVE" else "POLLING",
+                pillLabel,
                 Op01Theme.type.labelMd, colors.charcoalText,
                 maxLines = 1,
             )
         }
         HeaderKey(if (darkTheme) "☀" else "◐", onToggleTheme)
-        HeaderKey("⚙", onSettings)
     }
 }
 
@@ -256,7 +258,6 @@ private fun HeaderKey(glyph: String, onClick: () -> Unit) {
 @Composable
 private fun BottomNav(
     current: Op01Tab,
-    feedCount: Int,
     needsCount: Int,
     onSelect: (Op01Tab) -> Unit,
 ) {
@@ -302,30 +303,20 @@ private fun BottomNav(
                             animFg,
                             maxLines = 1,
                         )
-                        val count = when (entry) {
-                            Op01Tab.Feed -> feedCount
-                            Op01Tab.Needs -> needsCount
-                            else -> 0
-                        }
-                        if (count > 0) {
-                            val alert = entry == Op01Tab.Needs
+                        // Only Needs carries a badge: it counts tasks blocked
+                        // on the operator. (A Feed badge counted total
+                        // messages — a number with no action attached.)
+                        if (entry == Op01Tab.Needs && needsCount > 0) {
                             Box(
                                 modifier = Modifier
                                     .size(16.dp)
-                                    .background(
-                                        if (alert) colors.vermilion else colors.card,
-                                        CircleShape,
-                                    )
-                                    .border(
-                                        1.dp,
-                                        if (alert) colors.vermilion else colors.borderInset,
-                                        CircleShape,
-                                    ),
+                                    .background(colors.vermilion, CircleShape)
+                                    .border(1.dp, colors.vermilion, CircleShape),
                                 contentAlignment = Alignment.Center,
                             ) {
                                 HwText(
-                                    count.toString(), Op01Theme.type.labelMd,
-                                    if (alert) Color.White else colors.secondary,
+                                    needsCount.toString(), Op01Theme.type.labelMd,
+                                    Color.White,
                                     maxLines = 1,
                                 )
                             }

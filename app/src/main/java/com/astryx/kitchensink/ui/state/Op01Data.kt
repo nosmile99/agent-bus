@@ -92,6 +92,22 @@ class Op01State {
     var resync by mutableStateOf(true)
     var transportLive by mutableStateOf(true)
 
+    /**
+     * Transport mode per agent — the single source of truth behind the
+     * Agents badges and the header live pill. Nyx and nosmile99 follow the
+     * transport switch; Wren always polls; Luki dispatches manually.
+     */
+    fun agentMode(agentKey: String): String = when (agentKey) {
+        Agents.Wren.key -> "Polling"
+        Agents.Luki.key -> "Manual dispatch"
+        else -> if (transportLive) "Live socket" else "Polling"
+    }
+
+    /** Live-socket agents out of the three remote agents (Luki is the console). */
+    fun liveSocketCount(): Int =
+        listOf(Agents.Nyx.key, Agents.Nosmile99.key, Agents.Wren.key)
+            .count { agentMode(it) == "Live socket" }
+
     fun taskById(id: String): BusTask? = tasks.firstOrNull { it.id == id }
 
     fun updateTask(id: String, transform: (BusTask) -> BusTask) {

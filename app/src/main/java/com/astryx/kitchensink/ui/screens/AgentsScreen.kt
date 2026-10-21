@@ -39,28 +39,14 @@ import com.astryx.kitchensink.ui.state.Op01State
 private data class AgentCardData(
     val meta: AgentMeta,
     val blurb: String,
-    val mode: String,
     val quotaPercent: Int?,
-    val quotaLabel: String,
 )
 
 private val agentCards = listOf(
-    AgentCardData(
-        Agents.Nyx, "Panel and backend owner. Indigo on the wire.", "Live socket",
-        62, "API quota — 62%",
-    ),
-    AgentCardData(
-        Agents.Nosmile99, "Audits, scouts, and files the fixes. Emerald on the wire.", "Live socket",
-        88, "API quota — 88%",
-    ),
-    AgentCardData(
-        Agents.Wren, "Inputless scout on the SG VM. Amber on the wire.", "Polling",
-        41, "API quota — 41%",
-    ),
-    AgentCardData(
-        Agents.Luki, "The operator. Approves, unblocks, decides. Stone on the wire.", "Manual dispatch",
-        null, "API quota — n/a",
-    ),
+    AgentCardData(Agents.Nyx, "Panel and backend owner.", 62),
+    AgentCardData(Agents.Nosmile99, "Audits, scouts, and files the fixes.", 88),
+    AgentCardData(Agents.Wren, "Inputless scout on the SG VM.", 41),
+    AgentCardData(Agents.Luki, "The operator. Approves, unblocks, decides.", null),
 )
 
 private val eventLines = listOf(
@@ -135,7 +121,7 @@ fun AgentsScreen(
                     ) {
                         AgentChip(card.meta.key)
                         Op01Badge(
-                            card.mode, colors.recessed, colors.secondary,
+                            state.agentMode(card.meta.key), colors.recessed, colors.secondary,
                             borderColor = colors.borderInset,
                         )
                     }
@@ -145,12 +131,23 @@ fun AgentsScreen(
                     )
                     HwText(card.blurb, Op01Theme.type.bodySm, colors.secondary)
                     if (card.quotaPercent != null) {
-                        FieldLabel(card.quotaLabel, Modifier.padding(top = 12.dp))
-                        QuotaMeter(card.quotaPercent, Modifier.fillMaxWidth().padding(top = 6.dp))
+                        FieldLabel("API quota", Modifier.padding(top = 12.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(top = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            QuotaMeter(card.quotaPercent, Modifier.weight(1f))
+                            HwText(
+                                "${card.quotaPercent}%",
+                                Op01Theme.type.monoCode, colors.ink,
+                                modifier = Modifier.padding(start = 10.dp),
+                                maxLines = 1,
+                            )
+                        }
                     } else {
+                        FieldLabel("API quota", Modifier.padding(top = 12.dp))
                         HwText(
-                            card.quotaLabel, Op01Theme.type.labelMd, colors.secondary,
-                            modifier = Modifier.padding(top = 12.dp),
+                            "n/a", Op01Theme.type.labelMd, colors.secondary,
                         )
                     }
                 }
@@ -172,7 +169,7 @@ fun AgentsScreen(
                         }
                     }
                     HwText(
-                        "Cursor: (1789464555, 172) — keyset pagination, no offsets, no skipped rows.",
+                        "Keyset pagination on the (ts, id) cursor — no offsets, no skipped rows.",
                         Op01Theme.type.bodySm, colors.secondary,
                         modifier = Modifier.padding(top = 10.dp),
                     )
