@@ -17,8 +17,10 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -435,6 +437,61 @@ fun HwSelect(
                         )
                     }
                 }
+            }
+        }
+    }
+}
+
+/**
+ * The one segmented row. Every selector strip in the console (status,
+ * transport, due presets, bottom-nav keys) renders through this recipe:
+ * equal-weight segments, animated fill/label/border, and a hard shadow
+ * that grows in under the selected segment. [selectedColors] lets a
+ * caller override the selected fill/label per option (status colors);
+ * the default selection is ink on paper.
+ */
+@Composable
+fun <T> HwSegmentedRow(
+    options: List<T>,
+    selected: T,
+    onSelect: (T) -> Unit,
+    modifier: Modifier = Modifier,
+    spacing: Dp = 5.dp,
+    radius: Dp = Op01Radius.md,
+    minHeight: Dp = 44.dp,
+    contentPadding: PaddingValues = PaddingValues(horizontal = 2.dp, vertical = 8.dp),
+    selectedShadow: Dp = 2.dp,
+    selectedColors: (T) -> Pair<Color, Color>? = { null },
+    content: @Composable (option: T, fg: Color) -> Unit,
+) {
+    val colors = Op01Theme.colors
+    Row(modifier = modifier, horizontalArrangement = Arrangement.spacedBy(spacing)) {
+        options.forEach { option ->
+            val isSelected = option == selected
+            val custom = if (isSelected) selectedColors(option) else null
+            val bg = custom?.first ?: if (isSelected) colors.ink else colors.recessed
+            val fg = custom?.second ?: if (isSelected) colors.paper else colors.secondary
+            val animBg by animateOp01Color(bg, "segment-bg")
+            val animFg by animateOp01Color(fg, "segment-fg")
+            val animBorder by animateOp01Color(
+                if (isSelected) colors.borderHardware else colors.borderInset, "segment-border",
+            )
+            val animShadow by animateDpAsState(
+                if (isSelected) selectedShadow else 0.dp, Op01Motion.fast(), label = "segment-shadow",
+            )
+            val shape = RoundedCornerShape(radius)
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .hardShadow(radius, animShadow, colors.shadow)
+                    .background(animBg, shape)
+                    .border(1.5.dp, animBorder, shape)
+                    .clickable { onSelect(option) }
+                    .heightIn(min = minHeight)
+                    .padding(contentPadding),
+                contentAlignment = Alignment.Center,
+            ) {
+                content(option, animFg)
             }
         }
     }

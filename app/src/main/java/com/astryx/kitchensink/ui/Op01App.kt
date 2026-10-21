@@ -2,7 +2,6 @@ package com.astryx.kitchensink.ui
 
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
@@ -16,6 +15,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -40,6 +40,7 @@ import com.astryx.kitchensink.theme.Op01Colors
 import com.astryx.kitchensink.theme.Op01Radius
 import com.astryx.kitchensink.theme.Op01Space
 import com.astryx.kitchensink.theme.Op01Theme
+import com.astryx.kitchensink.ui.components.HwSegmentedRow
 import com.astryx.kitchensink.ui.components.HwText
 import com.astryx.kitchensink.ui.components.Op01Motion
 import com.astryx.kitchensink.ui.components.animateOp01Color
@@ -269,67 +270,52 @@ private fun BottomNav(
                 .heightIn(min = 1.5.dp, max = 1.5.dp)
                 .background(colors.borderSubtle),
         )
-        Row(
+        HwSegmentedRow(
+            options = Op01Tab.entries,
+            selected = current,
+            onSelect = onSelect,
             modifier = Modifier
                 .fillMaxWidth()
                 .navigationBarsPadding()
                 .padding(horizontal = 10.dp, vertical = 8.dp),
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
-        ) {
-        Op01Tab.entries.forEach { entry ->
-            val active = entry == current
-            val animBg by animateOp01Color(if (active) colors.ink else colors.recessed, "nav-bg")
-            val animFg by animateOp01Color(if (active) colors.paper else colors.secondary, "nav-fg")
-            val animBorder by animateOp01Color(if (active) colors.borderHardware else colors.borderInset, "nav-border")
-            val animShadow by animateDpAsState(
-                if (active) 2.5.dp else 0.dp, Op01Motion.fast(), label = "nav-shadow",
-            )
-            val shape = RoundedCornerShape(Op01Radius.lg)
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .hardShadow(Op01Radius.lg, animShadow, colors.shadow)
-                    .background(animBg, shape)
-                    .border(1.5.dp, animBorder, shape)
-                    .clickable { onSelect(entry) }
-                    .heightIn(min = 52.dp)
-                    .padding(vertical = 6.dp, horizontal = 2.dp),
-                contentAlignment = Alignment.Center,
-            ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Box(contentAlignment = Alignment.TopEnd) {
-                        HwText(
-                            entry.glyph, Op01Theme.type.bodyLg,
-                            animFg,
-                            maxLines = 1,
-                        )
-                        // Only Needs carries a badge: it counts tasks blocked
-                        // on the operator. (A Feed badge counted total
-                        // messages — a number with no action attached.)
-                        if (entry == Op01Tab.Needs && needsCount > 0) {
-                            Box(
-                                modifier = Modifier
-                                    .size(16.dp)
-                                    .background(colors.vermilion, CircleShape)
-                                    .border(1.dp, colors.vermilion, CircleShape),
-                                contentAlignment = Alignment.Center,
-                            ) {
-                                HwText(
-                                    needsCount.toString(), Op01Theme.type.labelMd,
-                                    Color.White,
-                                    maxLines = 1,
-                                )
-                            }
-                        }
-                    }
+            spacing = 6.dp,
+            radius = Op01Radius.lg,
+            minHeight = 52.dp,
+            selectedShadow = 2.5.dp,
+            contentPadding = PaddingValues(horizontal = 2.dp, vertical = 6.dp),
+        ) { entry, fg ->
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Box(contentAlignment = Alignment.TopEnd) {
                     HwText(
-                        entry.label, Op01Theme.type.labelMd,
-                        animFg,
+                        entry.glyph, Op01Theme.type.bodyLg,
+                        fg,
                         maxLines = 1,
                     )
+                    // Only Needs carries a badge: it counts tasks blocked
+                    // on the operator. (A Feed badge counted total
+                    // messages — a number with no action attached.)
+                    if (entry == Op01Tab.Needs && needsCount > 0) {
+                        Box(
+                            modifier = Modifier
+                                .size(16.dp)
+                                .background(colors.vermilion, CircleShape)
+                                .border(1.dp, colors.vermilion, CircleShape),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            HwText(
+                                needsCount.toString(), Op01Theme.type.labelMd,
+                                Color.White,
+                                maxLines = 1,
+                            )
+                        }
+                    }
                 }
+                HwText(
+                    entry.label, Op01Theme.type.labelMd,
+                    fg,
+                    maxLines = 1,
+                )
             }
-        }
         }
     }
 }

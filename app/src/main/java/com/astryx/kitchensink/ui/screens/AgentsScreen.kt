@@ -1,37 +1,26 @@
 package com.astryx.kitchensink.ui.screens
 
-import androidx.compose.animation.core.animateDpAsState
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import com.astryx.kitchensink.theme.Op01Radius
 import com.astryx.kitchensink.theme.Op01Theme
 import com.astryx.kitchensink.ui.components.AgentChip
 import com.astryx.kitchensink.ui.components.EnterItem
 import com.astryx.kitchensink.ui.components.FieldLabel
 import com.astryx.kitchensink.ui.components.HwCard
 import com.astryx.kitchensink.ui.components.HwInset
+import com.astryx.kitchensink.ui.components.HwSegmentedRow
 import com.astryx.kitchensink.ui.components.HwText
 import com.astryx.kitchensink.ui.components.Op01Badge
-import com.astryx.kitchensink.ui.components.Op01Motion
-import com.astryx.kitchensink.ui.components.animateOp01Color
 import com.astryx.kitchensink.ui.components.QuotaMeter
-import com.astryx.kitchensink.ui.components.hardShadow
 import com.astryx.kitchensink.ui.state.AgentMeta
 import com.astryx.kitchensink.ui.state.Agents
 import com.astryx.kitchensink.ui.state.Op01State
@@ -81,22 +70,15 @@ fun AgentsScreen(
             HwCard(Modifier.fillMaxWidth()) {
                 Column {
                     FieldLabel("Transport Mode")
-                    Row(
-                        modifier = Modifier.padding(top = 8.dp),
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    ) {
-                        TransportOption(
-                            label = "Live Socket",
-                            selected = state.transportLive,
-                            onClick = { state.transportLive = true },
-                            modifier = Modifier.weight(1f),
-                        )
-                        TransportOption(
-                            label = "Polling",
-                            selected = !state.transportLive,
-                            onClick = { state.transportLive = false },
-                            modifier = Modifier.weight(1f),
-                        )
+                    HwSegmentedRow(
+                        options = listOf("Live Socket", "Polling"),
+                        selected = if (state.transportLive) "Live Socket" else "Polling",
+                        onSelect = { state.transportLive = it == "Live Socket" },
+                        modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                        spacing = 6.dp,
+                        contentPadding = PaddingValues(horizontal = 6.dp, vertical = 10.dp),
+                    ) { label, fg ->
+                        HwText(label, Op01Theme.type.labelLg, fg, maxLines = 1)
                     }
                     HwText(
                         if (state.transportLive) {
@@ -176,38 +158,5 @@ fun AgentsScreen(
                 }
             }
         }
-    }
-}
-
-@Composable
-private fun TransportOption(
-    label: String,
-    selected: Boolean,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val colors = Op01Theme.colors
-    val animBg by animateOp01Color(if (selected) colors.ink else colors.recessed, "transport-bg")
-    val animFg by animateOp01Color(if (selected) colors.paper else colors.secondary, "transport-fg")
-    val animBorder by animateOp01Color(if (selected) colors.borderHardware else colors.borderInset, "transport-border")
-    val animShadow by animateDpAsState(
-        if (selected) 2.dp else 0.dp, Op01Motion.fast(), label = "transport-shadow",
-    )
-    val shape = RoundedCornerShape(Op01Radius.md)
-    Box(
-        modifier = modifier
-            .hardShadow(Op01Radius.md, animShadow, colors.shadow)
-            .background(animBg, shape)
-            .border(1.5.dp, animBorder, shape)
-            .clickable { onClick() }
-            .heightIn(min = 44.dp)
-            .padding(vertical = 10.dp, horizontal = 6.dp),
-        contentAlignment = Alignment.Center,
-    ) {
-        HwText(
-            label, Op01Theme.type.labelLg,
-            animFg,
-            maxLines = 1,
-        )
     }
 }

@@ -2,7 +2,6 @@ package com.astryx.kitchensink.ui.components
 
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.CubicBezierEasing
-import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -16,7 +15,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -254,7 +252,7 @@ fun MessageCard(
     }
 }
 
-/** 4-segment status strip. Tapping the current status is a strict no-op (state layer enforces it too). */
+/** 4-segment status strip — a [HwSegmentedRow] with per-status selection colors. Tapping the current status is a strict no-op (state layer enforces it too). */
 @Composable
 fun StatusStrip(
     current: TaskStatus,
@@ -262,39 +260,21 @@ fun StatusStrip(
     modifier: Modifier = Modifier,
 ) {
     val colors = Op01Theme.colors
-    Row(modifier = modifier, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
-        TaskStatus.entries.forEach { status ->
-            val isCurrent = status == current
-            val (bg, fg) = when {
-                !isCurrent -> colors.recessed to colors.secondary
-                status == TaskStatus.Doing -> colors.ochre to Color.White
-                status == TaskStatus.Blocked -> colors.vermilion to Color.White
-                status == TaskStatus.Done -> colors.forest to Color.White
-                else -> colors.ink to colors.paper
+    HwSegmentedRow(
+        options = TaskStatus.entries,
+        selected = current,
+        onSelect = onSelect,
+        modifier = modifier,
+        selectedColors = { status ->
+            when (status) {
+                TaskStatus.Doing -> colors.ochre to Color.White
+                TaskStatus.Blocked -> colors.vermilion to Color.White
+                TaskStatus.Done -> colors.forest to Color.White
+                TaskStatus.Todo -> colors.ink to colors.paper
             }
-            // Selection travels: fill, label, and border cross-fade while the
-            // hard shadow grows in — mechanical, no bounce.
-            val animBg by animateOp01Color(bg, "seg-bg")
-            val animFg by animateOp01Color(fg, "seg-fg")
-            val animBorder by animateOp01Color(if (isCurrent) colors.borderHardware else colors.borderInset, "seg-border")
-            val animShadow by animateDpAsState(
-                if (isCurrent) 2.dp else 0.dp, Op01Motion.fast(), label = "seg-shadow",
-            )
-            val shape = RoundedCornerShape(Op01Radius.md)
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .hardShadow(Op01Radius.md, animShadow, colors.shadow)
-                    .background(animBg, shape)
-                    .border(1.5.dp, animBorder, shape)
-                    .clickable { onSelect(status) }
-                    .heightIn(min = 44.dp)
-                    .padding(vertical = 8.dp, horizontal = 2.dp),
-                contentAlignment = Alignment.Center,
-            ) {
-                HwText(status.stripLabel, Op01Theme.type.labelMd, animFg, maxLines = 1)
-            }
-        }
+        },
+    ) { status, fg ->
+        HwText(status.stripLabel, Op01Theme.type.labelMd, fg, maxLines = 1)
     }
 }
 

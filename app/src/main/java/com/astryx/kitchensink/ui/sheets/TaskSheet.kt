@@ -2,7 +2,6 @@ package com.astryx.kitchensink.ui.sheets
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -15,9 +14,9 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
@@ -43,6 +42,7 @@ import com.astryx.kitchensink.ui.components.FieldLabel
 import com.astryx.kitchensink.ui.components.HwButton
 import com.astryx.kitchensink.ui.components.HwButtonStyle
 import com.astryx.kitchensink.ui.components.HwInset
+import com.astryx.kitchensink.ui.components.HwSegmentedRow
 import com.astryx.kitchensink.ui.components.HwSelect
 import com.astryx.kitchensink.ui.components.HwText
 import com.astryx.kitchensink.ui.components.HwTextField
@@ -51,7 +51,6 @@ import com.astryx.kitchensink.ui.components.Op01Motion
 import com.astryx.kitchensink.ui.components.animateOp01Color
 import com.astryx.kitchensink.ui.components.QuietBadge
 import com.astryx.kitchensink.ui.components.StatusStrip
-import com.astryx.kitchensink.ui.components.hardShadow
 import com.astryx.kitchensink.ui.state.Agents
 import com.astryx.kitchensink.ui.state.BusTask
 import com.astryx.kitchensink.ui.state.ChecklistItem
@@ -263,43 +262,19 @@ fun TaskSheet(
                     } else {
                         dueOptions
                     }
-                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        dueRowOptions.forEach { option ->
-                            val selected = if (option == "No due date") {
-                                task.due.isEmpty()
-                            } else {
-                                task.due == option
+                    HwSegmentedRow(
+                        options = dueRowOptions,
+                        selected = if (task.due.isEmpty()) "No due date" else task.due,
+                        onSelect = { option ->
+                            state.updateTask(task.id) {
+                                it.copy(due = if (option == "No due date") "" else option)
                             }
-                            val animBg by animateOp01Color(if (selected) colors.ink else colors.recessed, "due-bg")
-                            val animFg by animateOp01Color(if (selected) colors.paper else colors.secondary, "due-fg")
-                            val animBorder by animateOp01Color(if (selected) colors.borderHardware else colors.borderInset, "due-border")
-                            val animShadow by animateDpAsState(
-                                if (selected) 2.dp else 0.dp,
-                                Op01Motion.fast(), label = "due-shadow",
-                            )
-                            val shape = RoundedCornerShape(Op01Radius.md)
-                            Box(
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .hardShadow(Op01Radius.md, animShadow, colors.shadow)
-                                    .background(animBg, shape)
-                                    .border(1.5.dp, animBorder, shape)
-                                    .clickable {
-                                        state.updateTask(task.id) {
-                                            it.copy(due = if (option == "No due date") "" else option)
-                                        }
-                                    }
-                                    .heightIn(min = 44.dp)
-                                    .padding(horizontal = 8.dp, vertical = 8.dp),
-                                contentAlignment = Alignment.Center,
-                            ) {
-                                HwText(
-                                    option, Op01Theme.type.labelMd,
-                                    animFg,
-                                    maxLines = 1,
-                                )
-                            }
-                        }
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        spacing = 6.dp,
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp),
+                    ) { option, fg ->
+                        HwText(option, Op01Theme.type.labelMd, fg, maxLines = 1)
                     }
                     if (task.labels.isNotEmpty()) {
                         FieldLabel("Labels")
