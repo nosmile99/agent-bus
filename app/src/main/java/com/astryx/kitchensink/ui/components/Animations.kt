@@ -4,6 +4,7 @@ import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.TweenSpec
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.VectorConverter
 import androidx.compose.animation.core.animateValueAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Box

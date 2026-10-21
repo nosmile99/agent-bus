@@ -2,6 +2,7 @@ package com.astryx.kitchensink.ui
 
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.VectorConverter
 import androidx.compose.animation.core.animateValueAsState
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.fadeIn
@@ -351,6 +352,7 @@ private fun BottomNav(
  */
 @Composable
 fun AnimatedOp01Colors(target: Op01Colors): Op01Colors {
+    @Composable
     fun token(read: Op01Colors.() -> Color, label: String) = animateValueAsState(
         targetValue = target.read(),
         typeConverter = Color.VectorConverter,
