@@ -164,8 +164,8 @@ enum class HwButtonStyle { Primary, Positive, Danger, Secondary, CardSurface }
 fun HwButton(
     text: String,
     onClick: () -> Unit,
-    modifier: Modifier = Modifier,
     style: HwButtonStyle = HwButtonStyle.Secondary,
+    modifier: Modifier = Modifier,
     enabled: Boolean = true,
 ) {
     val colors = Op01Theme.colors
