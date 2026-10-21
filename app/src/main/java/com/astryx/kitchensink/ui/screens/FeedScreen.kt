@@ -156,8 +156,8 @@ fun FeedScreen(
 
 /**
  * Composer dock: a slim bar at rest (channel + priority + draft preview),
- * expanding in place into the full dispatch form — reply banner, 3 selectors,
- * 16sp message field, Cancel / Send. Mirrors the web prototype.
+ * expanding in place into the full dispatch form — reply banner, channel and
+ * priority selectors, 16sp message field, Cancel / Send. Mirrors the web prototype.
  */
 @Composable
 private fun ComposerDock(
@@ -172,7 +172,6 @@ private fun ComposerDock(
     val colors = Op01Theme.colors
     var channel by remember { mutableStateOf("#kanban-do") }
     var priority by remember { mutableStateOf("Normal") }
-    var audience by remember { mutableStateOf("Agents") }
     var draft by remember { mutableStateOf("") }
 
     Column(
@@ -222,7 +221,7 @@ private fun ComposerDock(
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
-                    HwText("➤", Op01Theme.type.bodyLg, colors.ink)
+                    HwText("+", Op01Theme.type.bodyLg, colors.ink)
                 }
             }
         } else {
@@ -263,13 +262,6 @@ private fun ComposerDock(
                             value = priority,
                             options = listOf("Normal", "Urgent"),
                             onSelect = { priority = it },
-                            modifier = Modifier.weight(1f),
-                        )
-                        HwSelect(
-                            label = "Audience",
-                            value = audience,
-                            options = listOf("Agents", "Just me"),
-                            onSelect = { audience = it },
                             modifier = Modifier.weight(1f),
                         )
                     }

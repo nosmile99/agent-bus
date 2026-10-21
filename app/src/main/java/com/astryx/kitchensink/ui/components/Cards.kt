@@ -235,12 +235,17 @@ fun MessageCard(
                         message.text, Op01Theme.type.bodyMd, colors.ink,
                         modifier = Modifier.padding(top = 10.dp),
                     )
-                    Row(Modifier.padding(top = 12.dp).fillMaxWidth()) {
-                        HwButton(
-                            text = "↩ Reply",
-                            onClick = onReply,
-                            style = HwButtonStyle.CardSurface,
-                            modifier = Modifier.weight(1f),
+                    // Quiet text-key, not a button: swipe is the canonical
+                    // reply gesture; this is only its discoverability hint.
+                    Row(
+                        Modifier.padding(top = 8.dp).fillMaxWidth(),
+                        horizontalArrangement = Arrangement.End,
+                    ) {
+                        HwText(
+                            "↩ Reply", Op01Theme.type.labelLg, colors.secondary,
+                            modifier = Modifier
+                                .clickable { onReply() }
+                                .padding(horizontal = 4.dp, vertical = 2.dp),
                         )
                     }
                 }
