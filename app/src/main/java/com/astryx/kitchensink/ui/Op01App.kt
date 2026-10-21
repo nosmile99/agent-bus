@@ -1,5 +1,16 @@
 package com.astryx.kitchensink.ui
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.animateColorAsState
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -26,11 +37,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import com.astryx.kitchensink.theme.Op01Colors
 import com.astryx.kitchensink.theme.Op01Radius
 import com.astryx.kitchensink.theme.Op01Space
 import com.astryx.kitchensink.theme.Op01Theme
 import com.astryx.kitchensink.ui.components.HwText
 import com.astryx.kitchensink.ui.components.LedDot
+import com.astryx.kitchensink.ui.components.Op01Motion
 import com.astryx.kitchensink.ui.components.hardShadow
 import com.astryx.kitchensink.ui.screens.AgentsScreen
 import com.astryx.kitchensink.ui.screens.BoardScreen
@@ -93,32 +106,48 @@ fun Op01App(
                     .fillMaxWidth()
                     .background(colors.paper),
             ) {
-                when (tab) {
-                    Op01Tab.Feed -> FeedScreen(
-                        state = state,
-                        onToast = { toast = it },
-                        modifier = Modifier.fillMaxSize(),
-                    )
-                    Op01Tab.Needs -> NeedsScreen(
-                        state = state,
-                        onOpenTask = { openTaskId = it },
-                        onToast = { toast = it },
-                        modifier = Modifier.fillMaxSize(),
-                    )
-                    Op01Tab.Board -> BoardScreen(
-                        state = state,
-                        onOpenTask = { openTaskId = it },
-                        onToast = { toast = it },
-                        modifier = Modifier.fillMaxSize(),
-                    )
-                    Op01Tab.Agents -> AgentsScreen(
-                        state = state,
-                        modifier = Modifier.fillMaxSize(),
-                    )
-                    Op01Tab.System -> SystemScreen(
-                        onToast = { toast = it },
-                        modifier = Modifier.fillMaxSize(),
-                    )
+                AnimatedContent(
+                    targetState = tab,
+                    transitionSpec = {
+                        val direction =
+                            if (targetState.ordinal > initialState.ordinal) 1 else -1
+                        (fadeIn(Op01Motion.color()) +
+                            slideInHorizontally(Op01Motion.medium()) { width -> direction * width / 6 })
+                            .togetherWith(
+                                fadeOut(Op01Motion.fast()) +
+                                    slideOutHorizontally(Op01Motion.fast()) { width -> -direction * width / 6 },
+                            )
+                    },
+                    label = "tab-content",
+                    modifier = Modifier.fillMaxSize(),
+                ) { currentTab ->
+                    when (currentTab) {
+                        Op01Tab.Feed -> FeedScreen(
+                            state = state,
+                            onToast = { toast = it },
+                            modifier = Modifier.fillMaxSize(),
+                        )
+                        Op01Tab.Needs -> NeedsScreen(
+                            state = state,
+                            onOpenTask = { openTaskId = it },
+                            onToast = { toast = it },
+                            modifier = Modifier.fillMaxSize(),
+                        )
+                        Op01Tab.Board -> BoardScreen(
+                            state = state,
+                            onOpenTask = { openTaskId = it },
+                            onToast = { toast = it },
+                            modifier = Modifier.fillMaxSize(),
+                        )
+                        Op01Tab.Agents -> AgentsScreen(
+                            state = state,
+                            modifier = Modifier.fillMaxSize(),
+                        )
+                        Op01Tab.System -> SystemScreen(
+                            onToast = { toast = it },
+                            modifier = Modifier.fillMaxSize(),
+                        )
+                    }
                 }
             }
             BottomNav(
@@ -138,10 +167,16 @@ fun Op01App(
             )
         }
 
-        if (toast != null) {
+        AnimatedVisibility(
+            visible = toast != null,
+            modifier = Modifier.align(Alignment.BottomCenter),
+            enter = fadeIn(Op01Motion.fast()) +
+                slideInVertically(Op01Motion.snap()) { it / 2 },
+            exit = fadeOut(Op01Motion.fast()) +
+                slideOutVertically(Op01Motion.snap()) { it / 2 },
+        ) {
             Box(
                 modifier = Modifier
-                    .align(Alignment.BottomCenter)
                     .navigationBarsPadding()
                     .padding(start = 16.dp, end = 16.dp, bottom = 92.dp)
                     .hardShadow(Op01Radius.lg, 3.dp, colors.shadow)
@@ -149,7 +184,7 @@ fun Op01App(
                     .border(1.5.dp, colors.borderHardware, RoundedCornerShape(Op01Radius.lg))
                     .padding(horizontal = 14.dp, vertical = 12.dp),
             ) {
-                HwText(toast!!, Op01Theme.type.bodyMd, colors.charcoalText)
+                HwText(toast ?: "", Op01Theme.type.bodyMd, colors.charcoalText)
             }
         }
     }
@@ -242,13 +277,28 @@ private fun BottomNav(
         ) {
         Op01Tab.entries.forEach { entry ->
             val active = entry == current
+            val animBg by animateColorAsState(
+                if (active) colors.ink else colors.recessed,
+                Op01Motion.color(), label = "nav-bg",
+            )
+            val animFg by animateColorAsState(
+                if (active) colors.paper else colors.secondary,
+                Op01Motion.color(), label = "nav-fg",
+            )
+            val animBorder by animateColorAsState(
+                if (active) colors.borderHardware else colors.borderInset,
+                Op01Motion.color(), label = "nav-border",
+            )
+            val animShadow by animateDpAsState(
+                if (active) 2.5.dp else 0.dp, Op01Motion.fast(), label = "nav-shadow",
+            )
             val shape = RoundedCornerShape(Op01Radius.lg)
             Box(
                 modifier = Modifier
                     .weight(1f)
-                    .then(if (active) Modifier.hardShadow(Op01Radius.lg, 2.5.dp, colors.shadow) else Modifier)
-                    .background(if (active) colors.ink else colors.recessed, shape)
-                    .border(1.5.dp, if (active) colors.borderHardware else colors.borderInset, shape)
+                    .hardShadow(Op01Radius.lg, animShadow, colors.shadow)
+                    .background(animBg, shape)
+                    .border(1.5.dp, animBorder, shape)
                     .clickable { onSelect(entry) }
                     .heightIn(min = 52.dp)
                     .padding(vertical = 6.dp, horizontal = 2.dp),
@@ -258,7 +308,7 @@ private fun BottomNav(
                     Box(contentAlignment = Alignment.TopEnd) {
                         HwText(
                             entry.glyph, Op01Theme.type.bodyLg,
-                            if (active) colors.paper else colors.secondary,
+                            animFg,
                             maxLines = 1,
                         )
                         val count = when (entry) {
@@ -292,7 +342,7 @@ private fun BottomNav(
                     }
                     HwText(
                         entry.label, Op01Theme.type.labelMd,
-                        if (active) colors.paper else colors.secondary,
+                        animFg,
                         maxLines = 1,
                     )
                 }
@@ -300,4 +350,63 @@ private fun BottomNav(
         }
         }
     }
+}
+
+/**
+ * Interpolates every OP-01 color token toward [target] so the light/dark
+ * toggle glides instead of hard-cutting. The host provides the result through
+ * [com.astryx.kitchensink.theme.LocalOp01Colors] inside the theme.
+ */
+@Composable
+fun AnimatedOp01Colors(target: Op01Colors): Op01Colors {
+    fun token(read: Op01Colors.() -> Color, label: String) = animateColorAsState(
+        targetValue = target.read(),
+        animationSpec = Op01Motion.theme(),
+        label = label,
+    )
+    val paper by token({ paper }, "theme-paper")
+    val card by token({ card }, "theme-card")
+    val recessed by token({ recessed }, "theme-recessed")
+    val ink by token({ ink }, "theme-ink")
+    val secondary by token({ secondary }, "theme-secondary")
+    val borderSoft by token({ borderSoft }, "theme-borderSoft")
+    val borderHardware by token({ borderHardware }, "theme-borderHardware")
+    val borderInset by token({ borderInset }, "theme-borderInset")
+    val shadow by token({ shadow }, "theme-shadow")
+    val charcoal by token({ charcoal }, "theme-charcoal")
+    val charcoalText by token({ charcoalText }, "theme-charcoalText")
+    val vermilion by token({ vermilion }, "theme-vermilion")
+    val forest by token({ forest }, "theme-forest")
+    val ochre by token({ ochre }, "theme-ochre")
+    val headerBg by token({ headerBg }, "theme-headerBg")
+    val headerText by token({ headerText }, "theme-headerText")
+    val headerBorder by token({ headerBorder }, "theme-headerBorder")
+    val headerAlarmBg by token({ headerAlarmBg }, "theme-headerAlarmBg")
+    val feedCard by token({ feedCard }, "theme-feedCard")
+    val cautionA by token({ cautionA }, "theme-cautionA")
+    val cautionB by token({ cautionB }, "theme-cautionB")
+    return Op01Colors(
+        paper = paper,
+        card = card,
+        recessed = recessed,
+        ink = ink,
+        secondary = secondary,
+        borderSoft = borderSoft,
+        borderHardware = borderHardware,
+        borderInset = borderInset,
+        shadow = shadow,
+        charcoal = charcoal,
+        charcoalText = charcoalText,
+        vermilion = vermilion,
+        forest = forest,
+        ochre = ochre,
+        headerBg = headerBg,
+        headerText = headerText,
+        headerBorder = headerBorder,
+        headerAlarmBg = headerAlarmBg,
+        feedCard = feedCard,
+        cautionA = cautionA,
+        cautionB = cautionB,
+        isDark = target.isDark,
+    )
 }

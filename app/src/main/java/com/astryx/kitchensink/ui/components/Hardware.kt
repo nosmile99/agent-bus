@@ -1,11 +1,18 @@
 package com.astryx.kitchensink.ui.components
 
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateColorAsState
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -157,7 +164,7 @@ enum class HwButtonStyle { Primary, Positive, Danger, Secondary, CardSurface }
 
 /**
  * Tactile keycap button. Rest: 1.5dp border, `0 2.5dp 0` hard shadow.
- * Pressed: translates down 2dp and the shadow collapses to 0.5dp (80ms, the
+ * Pressed: translates down 2dp and the shadow collapses to 0.5dp (120ms, the
  * physical switch travel from the spec). No ripple — the motion is the feedback.
  */
 @Composable
@@ -180,12 +187,12 @@ fun HwButton(
     val pressed by interaction.collectIsPressedAsState()
     val travel by animateDpAsState(
         targetValue = if (pressed && enabled) 2.dp else 0.dp,
-        animationSpec = tween(80),
+        animationSpec = tween(120),
         label = "keycap-travel",
     )
     val shadow by animateDpAsState(
         targetValue = if (pressed && enabled) 0.5.dp else 2.5.dp,
-        animationSpec = tween(80),
+        animationSpec = tween(120),
         label = "keycap-shadow",
     )
     val shape = RoundedCornerShape(Op01Radius.lg)
@@ -386,7 +393,11 @@ fun HwSelect(
                 HwText(if (expanded) "▴" else "▾", Op01Theme.type.bodyLg, colors.secondary)
             }
         }
-        if (expanded) {
+        AnimatedVisibility(
+            visible = expanded,
+            enter = expandVertically(Op01Motion.medium()) + fadeIn(Op01Motion.fast()),
+            exit = shrinkVertically(Op01Motion.fast()) + fadeOut(Op01Motion.fast()),
+        ) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -430,11 +441,20 @@ fun HwSelect(
     }
 }
 
-/** Rate-quota meter: recessed track, hardware border, forest fill (ochre at >= 85%). */
+/** Rate-quota meter: recessed track, hardware border, forest fill (ochre at >= 85%). Fill sweeps in on appearance. */
 @Composable
 fun QuotaMeter(percent: Int, modifier: Modifier = Modifier) {
     val colors = Op01Theme.colors
-    val fill = if (percent >= 85) colors.ochre else colors.forest
+    val fill by animateColorAsState(
+        if (percent >= 85) colors.ochre else colors.forest,
+        Op01Motion.color(),
+        label = "meter-fill",
+    )
+    val fraction by animateFloatAsState(
+        targetValue = percent.coerceIn(0, 100) / 100f,
+        animationSpec = tween(600),
+        label = "meter-fraction",
+    )
     val shape = RoundedCornerShape(Op01Radius.full)
     Box(
         modifier = modifier
@@ -446,7 +466,7 @@ fun QuotaMeter(percent: Int, modifier: Modifier = Modifier) {
     ) {
         Box(
             modifier = Modifier
-                .fillMaxWidth(percent.coerceIn(0, 100) / 100f)
+                .fillMaxWidth(fraction)
                 .height(12.dp)
                 .background(fill),
         )

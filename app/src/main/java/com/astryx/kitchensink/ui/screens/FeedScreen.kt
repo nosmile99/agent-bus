@@ -1,5 +1,12 @@
 package com.astryx.kitchensink.ui.screens
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -10,7 +17,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -25,6 +32,7 @@ import androidx.compose.ui.unit.dp
 import com.astryx.kitchensink.theme.Op01Radius
 import com.astryx.kitchensink.theme.Op01Theme
 import com.astryx.kitchensink.ui.components.CautionStripe
+import com.astryx.kitchensink.ui.components.EnterItem
 import com.astryx.kitchensink.ui.components.FlushCard
 import com.astryx.kitchensink.ui.components.HwButton
 import com.astryx.kitchensink.ui.components.HwButtonStyle
@@ -33,6 +41,7 @@ import com.astryx.kitchensink.ui.components.HwText
 import com.astryx.kitchensink.ui.components.HwTextField
 import com.astryx.kitchensink.ui.components.MessageCard
 import com.astryx.kitchensink.ui.components.Op01Badge
+import com.astryx.kitchensink.ui.components.Op01Motion
 import com.astryx.kitchensink.ui.components.QuietBadge
 import com.astryx.kitchensink.ui.state.Agents
 import com.astryx.kitchensink.ui.state.BusMessage
@@ -71,8 +80,12 @@ fun FeedScreen(
             contentPadding = androidx.compose.foundation.layout.PaddingValues(12.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
-            if (state.resync) {
-                item(key = "resync") {
+            item(key = "resync") {
+                AnimatedVisibility(
+                    visible = state.resync,
+                    enter = expandVertically(Op01Motion.medium()) + fadeIn(Op01Motion.fast()),
+                    exit = shrinkVertically(Op01Motion.medium()) + fadeOut(Op01Motion.fast()),
+                ) {
                     FlushCard(Modifier.fillMaxWidth()) {
                         Column {
                             CautionStripe(colors.cautionRedA, colors.cautionRedB)
@@ -98,12 +111,14 @@ fun FeedScreen(
             item(key = "head") {
                 ViewHead("Bus Feed", "Every agent message, one stream. Swipe a message right to reply.")
             }
-            items(state.messages, key = { it.id }) { message ->
-                MessageCard(
-                    message = message,
-                    onReply = { startReply(message) },
-                    modifier = Modifier.fillMaxWidth(),
-                )
+            itemsIndexed(state.messages, key = { _, message -> message.id }) { index, message ->
+                EnterItem(Modifier.fillMaxWidth(), delayMillis = (index * 40).coerceAtMost(160)) {
+                    MessageCard(
+                        message = message,
+                        onReply = { startReply(message) },
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
             }
         }
         ComposerDock(
@@ -172,7 +187,19 @@ private fun ComposerDock(
                 .background(colors.borderSubtle),
         )
         Box(modifier = Modifier.padding(12.dp)) {
-        if (!expanded) {
+        AnimatedContent(
+            targetState = expanded,
+            transitionSpec = {
+                (fadeIn(Op01Motion.fast()) +
+                    expandVertically(Op01Motion.medium(), expandFrom = Alignment.Bottom))
+                    .togetherWith(
+                        fadeOut(Op01Motion.fast()) +
+                            shrinkVertically(Op01Motion.fast(), shrinkTowards = Alignment.Bottom),
+                    )
+            },
+            label = "composer",
+        ) { isExpanded ->
+        if (!isExpanded) {
             FlushCard(Modifier.fillMaxWidth()) {
                 Row(
                     modifier = Modifier
@@ -281,6 +308,7 @@ private fun ComposerDock(
                     }
                 }
             }
+        }
         }
         }
     }

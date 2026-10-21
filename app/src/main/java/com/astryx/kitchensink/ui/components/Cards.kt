@@ -2,12 +2,12 @@ package com.astryx.kitchensink.ui.components
 
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.CubicBezierEasing
+import androidx.compose.animation.core.animateColorAsState
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -268,29 +268,31 @@ fun StatusStrip(
                 status == TaskStatus.Done -> colors.forest to Color.White
                 else -> colors.ink to colors.paper
             }
+            // Selection travels: fill, label, and border cross-fade while the
+            // hard shadow grows in — mechanical, no bounce.
+            val animBg by animateColorAsState(bg, Op01Motion.color(), label = "seg-bg")
+            val animFg by animateColorAsState(fg, Op01Motion.color(), label = "seg-fg")
+            val animBorder by animateColorAsState(
+                if (isCurrent) colors.borderHardware else colors.borderInset,
+                Op01Motion.color(),
+                label = "seg-border",
+            )
+            val animShadow by animateDpAsState(
+                if (isCurrent) 2.dp else 0.dp, Op01Motion.fast(), label = "seg-shadow",
+            )
             val shape = RoundedCornerShape(Op01Radius.md)
             Box(
                 modifier = Modifier
                     .weight(1f)
-                    .then(
-                        if (isCurrent) {
-                            Modifier.hardShadow(Op01Radius.md, 2.dp, colors.shadow)
-                        } else {
-                            Modifier
-                        },
-                    )
-                    .background(bg, shape)
-                    .border(
-                        1.5.dp,
-                        if (isCurrent) colors.borderHardware else colors.borderInset,
-                        shape,
-                    )
+                    .hardShadow(Op01Radius.md, animShadow, colors.shadow)
+                    .background(animBg, shape)
+                    .border(1.5.dp, animBorder, shape)
                     .clickable { onSelect(status) }
                     .heightIn(min = 44.dp)
                     .padding(vertical = 8.dp, horizontal = 2.dp),
                 contentAlignment = Alignment.Center,
             ) {
-                HwText(status.stripLabel, Op01Theme.type.labelMd, fg, maxLines = 1)
+                HwText(status.stripLabel, Op01Theme.type.labelMd, animFg, maxLines = 1)
             }
         }
     }
@@ -320,30 +322,18 @@ fun CautionHeader(task: BusTask, modifier: Modifier = Modifier) {
     }
 }
 
-/**
- * Kanban task card. Long-press toggles the charcoal quick-action tray
- * (Mark done / Claim / Close) — the tap fallback for the swipe tray, which
- * would fight the board pager's horizontal paging gestures.
- */
-@OptIn(ExperimentalFoundationApi::class)
+/** Kanban task card: caution header, content, actions, status strip. */
 @Composable
 fun TaskCard(
     task: BusTask,
     onOpen: () -> Unit,
     onDone: () -> Unit,
     onStatus: (TaskStatus) -> Unit,
-    onClaim: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val colors = Op01Theme.colors
-    var trayOpen by remember(task.id) { mutableStateOf(false) }
     FlushCard(modifier = modifier) {
-        Column(
-            modifier = Modifier.combinedClickable(
-                onClick = {},
-                onLongClick = { trayOpen = !trayOpen },
-            ),
-        ) {
+        Column {
             CautionHeader(task, Modifier.fillMaxWidth())
             Column(Modifier.padding(12.dp)) {
                 HwText(task.title, Op01Theme.type.titleCard, colors.ink)
@@ -361,34 +351,6 @@ fun TaskCard(
                     QuietBadge("${task.todosDone}/${task.todosTotal} todos")
                     if (task.priority == "Urgent") {
                         Op01Badge("Urgent", colors.vermilion, Color.White)
-                    }
-                }
-                if (trayOpen) {
-                    Row(
-                        modifier = Modifier
-                            .padding(top = 10.dp)
-                            .background(colors.charcoal, RoundedCornerShape(Op01Radius.lg))
-                            .padding(6.dp),
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    ) {
-                        HwButton(
-                            "Mark done",
-                            onClick = { trayOpen = false; onDone() },
-                            style = HwButtonStyle.Positive,
-                            modifier = Modifier.weight(1f),
-                        )
-                        HwButton(
-                            "Claim",
-                            onClick = { trayOpen = false; onClaim() },
-                            style = HwButtonStyle.Secondary,
-                            modifier = Modifier.weight(1f),
-                        )
-                        HwButton(
-                            "Close",
-                            onClick = { trayOpen = false },
-                            style = HwButtonStyle.Secondary,
-                            modifier = Modifier.weight(1f),
-                        )
                     }
                 }
                 Row(

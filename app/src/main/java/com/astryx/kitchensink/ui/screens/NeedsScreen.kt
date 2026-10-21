@@ -14,6 +14,7 @@ import androidx.compose.ui.unit.dp
 import com.astryx.kitchensink.theme.Op01Theme
 import com.astryx.kitchensink.ui.components.AgentChip
 import com.astryx.kitchensink.ui.components.CautionStripe
+import com.astryx.kitchensink.ui.components.EnterItem
 import com.astryx.kitchensink.ui.components.FlushCard
 import com.astryx.kitchensink.ui.components.HwButton
 import com.astryx.kitchensink.ui.components.HwButtonStyle
@@ -60,6 +61,7 @@ fun NeedsScreen(
             }
         }
         items(tasks, key = { it.id }) { task ->
+            EnterItem(Modifier.fillMaxWidth()) {
             FlushCard(Modifier.fillMaxWidth()) {
                 Column {
                     CautionStripe(colors.cautionRedA, colors.cautionRedB)
@@ -104,6 +106,7 @@ fun NeedsScreen(
                         }
                     }
                 }
+            }
             }
         }
     }

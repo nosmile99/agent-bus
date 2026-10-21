@@ -1,5 +1,7 @@
 package com.astryx.kitchensink.ui.screens
 
+import androidx.compose.animation.core.animateColorAsState
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -14,17 +16,20 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.astryx.kitchensink.theme.Op01Radius
 import com.astryx.kitchensink.theme.Op01Theme
 import com.astryx.kitchensink.ui.components.AgentChip
+import com.astryx.kitchensink.ui.components.EnterItem
 import com.astryx.kitchensink.ui.components.FieldLabel
 import com.astryx.kitchensink.ui.components.HwCard
 import com.astryx.kitchensink.ui.components.HwInset
 import com.astryx.kitchensink.ui.components.HwText
 import com.astryx.kitchensink.ui.components.Op01Badge
+import com.astryx.kitchensink.ui.components.Op01Motion
 import com.astryx.kitchensink.ui.components.QuotaMeter
 import com.astryx.kitchensink.ui.components.hardShadow
 import com.astryx.kitchensink.ui.state.AgentMeta
@@ -121,6 +126,7 @@ fun AgentsScreen(
         }
         items(agentCards.size, key = { agentCards[it].meta.key }) { index ->
             val card = agentCards[index]
+            EnterItem(Modifier.fillMaxWidth(), delayMillis = (index * 40).coerceAtMost(120)) {
             HwCard(Modifier.fillMaxWidth()) {
                 Column {
                     Row(
@@ -148,6 +154,7 @@ fun AgentsScreen(
                         )
                     }
                 }
+            }
             }
         }
         item(key = "events") {
@@ -183,12 +190,27 @@ private fun TransportOption(
     modifier: Modifier = Modifier,
 ) {
     val colors = Op01Theme.colors
+    val animBg by animateColorAsState(
+        if (selected) colors.ink else colors.recessed,
+        Op01Motion.color(), label = "transport-bg",
+    )
+    val animFg by animateColorAsState(
+        if (selected) colors.paper else colors.secondary,
+        Op01Motion.color(), label = "transport-fg",
+    )
+    val animBorder by animateColorAsState(
+        if (selected) colors.borderHardware else colors.borderInset,
+        Op01Motion.color(), label = "transport-border",
+    )
+    val animShadow by animateDpAsState(
+        if (selected) 2.dp else 0.dp, Op01Motion.fast(), label = "transport-shadow",
+    )
     val shape = RoundedCornerShape(Op01Radius.md)
     Box(
         modifier = modifier
-            .then(if (selected) Modifier.hardShadow(Op01Radius.md, 2.dp, colors.shadow) else Modifier)
-            .background(if (selected) colors.ink else colors.recessed, shape)
-            .border(1.5.dp, if (selected) colors.borderHardware else colors.borderInset, shape)
+            .hardShadow(Op01Radius.md, animShadow, colors.shadow)
+            .background(animBg, shape)
+            .border(1.5.dp, animBorder, shape)
             .clickable { onClick() }
             .heightIn(min = 44.dp)
             .padding(vertical = 10.dp, horizontal = 6.dp),
@@ -196,7 +218,7 @@ private fun TransportOption(
     ) {
         HwText(
             label, Op01Theme.type.labelLg,
-            if (selected) colors.paper else colors.secondary,
+            animFg,
             maxLines = 1,
         )
     }

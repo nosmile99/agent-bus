@@ -1,5 +1,13 @@
 package com.astryx.kitchensink.ui.sheets
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.animateColorAsState
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -16,13 +24,16 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.dp
 import com.astryx.kitchensink.theme.Op01Radius
 import com.astryx.kitchensink.theme.Op01Theme
@@ -36,6 +47,7 @@ import com.astryx.kitchensink.ui.components.HwSelect
 import com.astryx.kitchensink.ui.components.HwText
 import com.astryx.kitchensink.ui.components.HwTextField
 import com.astryx.kitchensink.ui.components.Op01Badge
+import com.astryx.kitchensink.ui.components.Op01Motion
 import com.astryx.kitchensink.ui.components.QuietBadge
 import com.astryx.kitchensink.ui.components.StatusStrip
 import com.astryx.kitchensink.ui.components.hardShadow
@@ -45,6 +57,8 @@ import com.astryx.kitchensink.ui.state.ChecklistItem
 import com.astryx.kitchensink.ui.state.Op01State
 import com.astryx.kitchensink.ui.state.TaskComment
 import com.astryx.kitchensink.ui.state.TaskStatus
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 private val dueOptions = listOf("No due date", "Today", "Tomorrow", "This week", "Next week")
 
@@ -68,6 +82,12 @@ fun TaskSheet(
     var commentDraft by remember(task.id) { mutableStateOf("") }
     var confirmDelete by remember(task.id) { mutableStateOf(false) }
 
+    // The sheet owns its visibility so the exit slide plays before the host
+    // uncomposes it: dismiss() flips the flag, then closes after the travel.
+    val scope = rememberCoroutineScope()
+    var sheetVisible by remember(task.id) { mutableStateOf(false) }
+    LaunchedEffect(task.id) { sheetVisible = true }
+
     fun persistDrafts() {
         state.updateTask(task.id) {
             it.copy(
@@ -78,21 +98,42 @@ fun TaskSheet(
         }
     }
 
+    fun dismiss(after: () -> Unit = {}) {
+        if (!sheetVisible) return
+        sheetVisible = false
+        scope.launch {
+            delay(300)
+            after()
+            onClose()
+        }
+    }
+
     Box(Modifier.fillMaxSize()) {
         // Scrim
-        Box(
-            Modifier
-                .fillMaxSize()
-                .background(Color(0xFF161615).copy(alpha = 0.55f))
-                .clickable {
-                    persistDrafts()
-                    onClose()
-                },
-        )
+        AnimatedVisibility(
+            visible = sheetVisible,
+            enter = fadeIn(Op01Motion.medium()),
+            exit = fadeOut(Op01Motion.medium()),
+        ) {
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .background(Color(0xFF161615).copy(alpha = 0.55f))
+                    .clickable {
+                        persistDrafts()
+                        dismiss()
+                    },
+            )
+        }
         // Panel
+        AnimatedVisibility(
+            visible = sheetVisible,
+            modifier = Modifier.align(Alignment.BottomCenter),
+            enter = slideInVertically(Op01Motion.snap()) { it } + fadeIn(Op01Motion.fast()),
+            exit = slideOutVertically(Op01Motion.snap()) { it } + fadeOut(Op01Motion.fast()),
+        ) {
         Column(
             modifier = Modifier
-                .align(Alignment.BottomCenter)
                 .fillMaxWidth()
                 .fillMaxSize(0.94f)
                 .background(
@@ -143,7 +184,7 @@ fun TaskSheet(
                     "✕",
                     onClick = {
                         persistDrafts()
-                        onClose()
+                        dismiss()
                     },
                     style = HwButtonStyle.Secondary,
                 )
@@ -209,25 +250,29 @@ fun TaskSheet(
                     Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                         dueOptions.forEach { option ->
                             val selected = task.due == option
+                            val animBg by animateColorAsState(
+                                if (selected) colors.ink else colors.recessed,
+                                Op01Motion.color(), label = "due-bg",
+                            )
+                            val animFg by animateColorAsState(
+                                if (selected) colors.paper else colors.secondary,
+                                Op01Motion.color(), label = "due-fg",
+                            )
+                            val animBorder by animateColorAsState(
+                                if (selected) colors.borderHardware else colors.borderInset,
+                                Op01Motion.color(), label = "due-border",
+                            )
+                            val animShadow by animateDpAsState(
+                                if (selected) 2.dp else 0.dp,
+                                Op01Motion.fast(), label = "due-shadow",
+                            )
                             val shape = RoundedCornerShape(Op01Radius.md)
                             Box(
                                 modifier = Modifier
                                     .weight(1f)
-                                    .then(
-                                        if (selected) {
-                                            Modifier.hardShadow(Op01Radius.md, 2.dp, colors.shadow)
-                                        } else {
-                                            Modifier
-                                        },
-                                    )
-                                    .background(
-                                        if (selected) colors.ink else colors.recessed, shape,
-                                    )
-                                    .border(
-                                        1.5.dp,
-                                        if (selected) colors.borderHardware else colors.borderInset,
-                                        shape,
-                                    )
+                                    .hardShadow(Op01Radius.md, animShadow, colors.shadow)
+                                    .background(animBg, shape)
+                                    .border(1.5.dp, animBorder, shape)
                                     .clickable {
                                         state.updateTask(task.id) { it.copy(due = option) }
                                     }
@@ -237,7 +282,7 @@ fun TaskSheet(
                             ) {
                                 HwText(
                                     option, Op01Theme.type.labelMd,
-                                    if (selected) colors.paper else colors.secondary,
+                                    animFg,
                                     maxLines = 1,
                                 )
                             }
@@ -339,7 +384,7 @@ fun TaskSheet(
                         "Close",
                         onClick = {
                             persistDrafts()
-                            onClose()
+                            dismiss()
                         },
                         style = HwButtonStyle.Secondary,
                         modifier = Modifier.weight(1f),
@@ -349,7 +394,7 @@ fun TaskSheet(
                         onClick = {
                             persistDrafts()
                             onToast("Saved — Task #${task.num}.")
-                            onClose()
+                            dismiss()
                         },
                         style = HwButtonStyle.Primary,
                         modifier = Modifier.weight(1f),
@@ -357,24 +402,42 @@ fun TaskSheet(
                 }
             }
         }
-
-        if (confirmDelete) {
-            DeleteConfirm(
-                taskNum = task.num,
-                onCancel = { confirmDelete = false },
-                onConfirm = {
-                    state.removeTask(task.id)
-                    onToast("Deleted — Task #${task.num} is gone.")
-                    onClose()
-                },
-            )
         }
+
+        DeleteConfirm(
+            visible = confirmDelete,
+            taskNum = task.num,
+            onCancel = { confirmDelete = false },
+            onConfirm = {
+                confirmDelete = false
+                onToast("Deleted — Task #${task.num} is gone.")
+                dismiss { state.removeTask(task.id) }
+            },
+        )
     }
 }
 
 @Composable
 private fun ChecklistRow(item: ChecklistItem, onToggle: () -> Unit) {
     val colors = Op01Theme.colors
+    val boxBg by animateColorAsState(
+        if (item.done) colors.forest else colors.card,
+        Op01Motion.color(), label = "check-bg",
+    )
+    val textColor by animateColorAsState(
+        if (item.done) colors.secondary else colors.ink,
+        Op01Motion.color(), label = "check-text",
+    )
+    val checkScale by animateFloatAsState(
+        targetValue = if (item.done) 1f else 0.4f,
+        animationSpec = Op01Motion.snap(),
+        label = "check-scale",
+    )
+    val checkAlpha by animateFloatAsState(
+        targetValue = if (item.done) 1f else 0f,
+        animationSpec = Op01Motion.fast(),
+        label = "check-alpha",
+    )
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -386,35 +449,49 @@ private fun ChecklistRow(item: ChecklistItem, onToggle: () -> Unit) {
         Box(
             modifier = Modifier
                 .size(26.dp)
-                .background(
-                    if (item.done) colors.forest else colors.card,
-                    RoundedCornerShape(Op01Radius.sm),
-                )
+                .background(boxBg, RoundedCornerShape(Op01Radius.sm))
                 .border(1.5.dp, colors.borderHardware, RoundedCornerShape(Op01Radius.sm)),
             contentAlignment = Alignment.Center,
         ) {
-            if (item.done) {
-                HwText("✓", Op01Theme.type.labelLg, Color.White)
-            }
+            HwText(
+                "✓", Op01Theme.type.labelLg, Color.White,
+                modifier = Modifier.graphicsLayer {
+                    scaleX = checkScale
+                    scaleY = checkScale
+                    alpha = checkAlpha
+                },
+            )
         }
         HwText(
             item.text, Op01Theme.type.bodyMd,
-            if (item.done) colors.secondary else colors.ink,
+            textColor,
             modifier = Modifier.weight(1f),
         )
     }
 }
 
 @Composable
-private fun DeleteConfirm(taskNum: Int, onCancel: () -> Unit, onConfirm: () -> Unit) {
+private fun DeleteConfirm(
+    visible: Boolean,
+    taskNum: Int,
+    onCancel: () -> Unit,
+    onConfirm: () -> Unit,
+) {
     val colors = Op01Theme.colors
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color(0xFF161615).copy(alpha = 0.55f))
-            .clickable { onCancel() },
-        contentAlignment = Alignment.BottomCenter,
+    AnimatedVisibility(
+        visible = visible,
+        enter = fadeIn(Op01Motion.fast()) +
+            slideInVertically(Op01Motion.snap()) { it / 3 },
+        exit = fadeOut(Op01Motion.fast()) +
+            slideOutVertically(Op01Motion.snap()) { it / 3 },
     ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color(0xFF161615).copy(alpha = 0.55f))
+                .clickable { onCancel() },
+            contentAlignment = Alignment.BottomCenter,
+        ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -442,6 +519,7 @@ private fun DeleteConfirm(taskNum: Int, onCancel: () -> Unit, onConfirm: () -> U
                 HwButton("Keep task", onCancel, HwButtonStyle.Secondary, Modifier.weight(1f))
                 HwButton("Delete it", onConfirm, HwButtonStyle.Danger, Modifier.weight(1f))
             }
+        }
         }
     }
 }
