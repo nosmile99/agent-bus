@@ -165,16 +165,6 @@ fun TaskSheet(
                         colors.charcoalText.copy(alpha = 0.75f), maxLines = 1,
                     )
                 }
-                if (task.status != TaskStatus.Done) {
-                    HwButton(
-                        "Mark done",
-                        onClick = {
-                            state.setStatus(task, TaskStatus.Done)
-                            onToast("Marked done — Task #${task.num}.")
-                        },
-                        style = HwButtonStyle.Positive,
-                    )
-                }
                 HwButton(
                     "Delete",
                     onClick = { confirmDelete = true },

@@ -118,10 +118,6 @@ fun BoardScreen(
                                     TaskCard(
                                         task = task,
                                         onOpen = { onOpenTask(task.id) },
-                                        onDone = {
-                                            state.setStatus(task, TaskStatus.Done)
-                                            onToast("Marked done — Task #${task.num}.")
-                                        },
                                         onStatus = { next ->
                                             state.setStatus(task, next)
                                             if (next != task.status) {

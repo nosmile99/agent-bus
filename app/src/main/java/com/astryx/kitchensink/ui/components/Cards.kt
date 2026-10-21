@@ -317,12 +317,11 @@ fun CautionHeader(task: BusTask, modifier: Modifier = Modifier) {
     }
 }
 
-/** Kanban task card: caution header, content, actions, status strip. */
+/** Kanban task card: caution header, content, Open, status strip (the single status editor). */
 @Composable
 fun TaskCard(
     task: BusTask,
     onOpen: () -> Unit,
-    onDone: () -> Unit,
     onStatus: (TaskStatus) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -352,12 +351,6 @@ fun TaskCard(
                     modifier = Modifier.padding(top = 12.dp),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    HwButton(
-                        "Mark done",
-                        onClick = onDone,
-                        style = HwButtonStyle.Positive,
-                        modifier = Modifier.weight(1f),
-                    )
                     HwButton(
                         "Open",
                         onClick = onOpen,

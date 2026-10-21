@@ -89,7 +89,7 @@ fun NeedsScreen(
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
                         ) {
                             HwButton(
-                                "Unblock",
+                                "Unblock → Doing",
                                 onClick = {
                                     state.setStatus(task, TaskStatus.Doing)
                                     onToast("Unblocked — Task #${task.num} is moving again.")
