@@ -172,6 +172,7 @@ export async function handleKbAdminTaskUpdate(this: IBusDO, req: Request, id: nu
     vals.push(payload.priority);
     fieldEvents.push("priority");
   }
+  let assignedAssignee: string | null = null;
   if (payload && "assignee" in payload) {
     if (payload.assignee === null) {
       updates.push("assignee = NULL", "admin_assigned = NULL");
@@ -180,6 +181,7 @@ export async function handleKbAdminTaskUpdate(this: IBusDO, req: Request, id: nu
       updates.push("assignee = ?", "admin_assigned = ?", "claimed_at = ?");
       vals.push(payload.assignee, payload.assignee, now);
       fieldEvents.push("assignee");
+      assignedAssignee = payload.assignee;
     } else {
       return this.json(400, { error: "assignee must be a string or null" });
     }
@@ -200,6 +202,19 @@ export async function handleKbAdminTaskUpdate(this: IBusDO, req: Request, id: nu
       actor: "admin",
       project_id: task.project_id,
       payload: statusEvent.payload,
+    });
+  }
+  if (assignedAssignee) {
+    this.emitEvent("kanban.task.assigned", {
+      actor: "admin",
+      project_id: task.project_id,
+      recipients: [assignedAssignee],
+      payload: {
+        task_id: id,
+        project_id: task.project_id,
+        assignee: assignedAssignee,
+        assigned_by: this.kbBasicUser(req),
+      },
     });
   }
   if (statusEvent || fieldEvents.length) {
