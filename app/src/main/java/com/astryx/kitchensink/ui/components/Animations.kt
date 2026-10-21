@@ -3,14 +3,14 @@ package com.astryx.kitchensink.ui.components
 import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.TweenSpec
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.VectorConverter
-import androidx.compose.animation.core.animateValueAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Box
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.State
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -18,6 +18,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
 
@@ -75,15 +76,28 @@ fun EnterItem(
 }
 
 /**
- * Color tween on the shared motion spec, built on animation-core's
- * [animateValueAsState] + [Color.VectorConverter] — the dedicated
- * animateColorAsState helper is not on this module's classpath.
+ * Color tween on the shared motion spec. Neither animateColorAsState nor
+ * Color.VectorConverter is on this module's classpath (they live outside
+ * animation-core), so the tween runs a float progress on [Animatable] —
+ * which is — and lerps between the endpoint colors. Retargeting mid-flight
+ * starts from the currently displayed color, like the real helper.
  */
 @Composable
-fun animateOp01Color(target: Color, label: String): State<Color> =
-    animateValueAsState(
-        targetValue = target,
-        typeConverter = Color.VectorConverter,
-        animationSpec = Op01Motion.color(),
-        label = label,
-    )
+fun animateOp01Color(
+    target: Color,
+    label: String,
+    spec: TweenSpec<Float> = Op01Motion.color(),
+): State<Color> {
+    var from by remember { mutableStateOf(target) }
+    var to by remember { mutableStateOf(target) }
+    val progress = remember { Animatable(1f) }
+    LaunchedEffect(target) {
+        if (target != to) {
+            from = lerp(from, to, progress.value)
+            to = target
+            progress.snapTo(0f)
+            progress.animateTo(1f, spec)
+        }
+    }
+    return remember { derivedStateOf { lerp(from, to, progress.value) } }
+}

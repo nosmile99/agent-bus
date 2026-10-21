@@ -2,8 +2,6 @@ package com.astryx.kitchensink.ui
 
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.VectorConverter
-import androidx.compose.animation.core.animateValueAsState
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -353,12 +351,8 @@ private fun BottomNav(
 @Composable
 fun AnimatedOp01Colors(target: Op01Colors): Op01Colors {
     @Composable
-    fun token(read: Op01Colors.() -> Color, label: String) = animateValueAsState(
-        targetValue = target.read(),
-        typeConverter = Color.VectorConverter,
-        animationSpec = Op01Motion.theme(),
-        label = label,
-    )
+    fun token(read: Op01Colors.() -> Color, label: String) =
+        animateOp01Color(target.read(), label, Op01Motion.theme())
     val paper by token({ paper }, "theme-paper")
     val outer by token({ outer }, "theme-outer")
     val card by token({ card }, "theme-card")
