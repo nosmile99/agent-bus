@@ -2,7 +2,6 @@ package com.astryx.kitchensink.ui.components
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateColorAsState
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
@@ -445,11 +444,7 @@ fun HwSelect(
 @Composable
 fun QuotaMeter(percent: Int, modifier: Modifier = Modifier) {
     val colors = Op01Theme.colors
-    val fill by animateColorAsState(
-        if (percent >= 85) colors.ochre else colors.forest,
-        Op01Motion.color(),
-        label = "meter-fill",
-    )
+    val fill by animateOp01Color(if (percent >= 85) colors.ochre else colors.forest, "meter-fill")
     val fraction by animateFloatAsState(
         targetValue = percent.coerceIn(0, 100) / 100f,
         animationSpec = tween(600),

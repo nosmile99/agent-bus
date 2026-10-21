@@ -2,7 +2,7 @@ package com.astryx.kitchensink.ui
 
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.animateColorAsState
+import androidx.compose.animation.core.animateValueAsState
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -44,6 +44,7 @@ import com.astryx.kitchensink.theme.Op01Theme
 import com.astryx.kitchensink.ui.components.HwText
 import com.astryx.kitchensink.ui.components.LedDot
 import com.astryx.kitchensink.ui.components.Op01Motion
+import com.astryx.kitchensink.ui.components.animateOp01Color
 import com.astryx.kitchensink.ui.components.hardShadow
 import com.astryx.kitchensink.ui.screens.AgentsScreen
 import com.astryx.kitchensink.ui.screens.BoardScreen
@@ -277,18 +278,9 @@ private fun BottomNav(
         ) {
         Op01Tab.entries.forEach { entry ->
             val active = entry == current
-            val animBg by animateColorAsState(
-                if (active) colors.ink else colors.recessed,
-                Op01Motion.color(), label = "nav-bg",
-            )
-            val animFg by animateColorAsState(
-                if (active) colors.paper else colors.secondary,
-                Op01Motion.color(), label = "nav-fg",
-            )
-            val animBorder by animateColorAsState(
-                if (active) colors.borderHardware else colors.borderInset,
-                Op01Motion.color(), label = "nav-border",
-            )
+            val animBg by animateOp01Color(if (active) colors.ink else colors.recessed, "nav-bg")
+            val animFg by animateOp01Color(if (active) colors.paper else colors.secondary, "nav-fg")
+            val animBorder by animateOp01Color(if (active) colors.borderHardware else colors.borderInset, "nav-border")
             val animShadow by animateDpAsState(
                 if (active) 2.5.dp else 0.dp, Op01Motion.fast(), label = "nav-shadow",
             )
@@ -359,8 +351,9 @@ private fun BottomNav(
  */
 @Composable
 fun AnimatedOp01Colors(target: Op01Colors): Op01Colors {
-    fun token(read: Op01Colors.() -> Color, label: String) = animateColorAsState(
+    fun token(read: Op01Colors.() -> Color, label: String) = animateValueAsState(
         targetValue = target.read(),
+        typeConverter = Color.VectorConverter,
         animationSpec = Op01Motion.theme(),
         label = label,
     )

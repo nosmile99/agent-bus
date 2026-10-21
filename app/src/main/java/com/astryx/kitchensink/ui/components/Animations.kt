@@ -4,15 +4,18 @@ import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.TweenSpec
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.animateValueAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Box
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
@@ -69,3 +72,17 @@ fun EnterItem(
         },
     ) { content() }
 }
+
+/**
+ * Color tween on the shared motion spec, built on animation-core's
+ * [animateValueAsState] + [Color.VectorConverter] — the dedicated
+ * animateColorAsState helper is not on this module's classpath.
+ */
+@Composable
+fun animateOp01Color(target: Color, label: String): State<Color> =
+    animateValueAsState(
+        targetValue = target,
+        typeConverter = Color.VectorConverter,
+        animationSpec = Op01Motion.color(),
+        label = label,
+    )

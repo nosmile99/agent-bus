@@ -2,7 +2,6 @@ package com.astryx.kitchensink.ui.components
 
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.CubicBezierEasing
-import androidx.compose.animation.core.animateColorAsState
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
@@ -270,13 +269,9 @@ fun StatusStrip(
             }
             // Selection travels: fill, label, and border cross-fade while the
             // hard shadow grows in — mechanical, no bounce.
-            val animBg by animateColorAsState(bg, Op01Motion.color(), label = "seg-bg")
-            val animFg by animateColorAsState(fg, Op01Motion.color(), label = "seg-fg")
-            val animBorder by animateColorAsState(
-                if (isCurrent) colors.borderHardware else colors.borderInset,
-                Op01Motion.color(),
-                label = "seg-border",
-            )
+            val animBg by animateOp01Color(bg, "seg-bg")
+            val animFg by animateOp01Color(fg, "seg-fg")
+            val animBorder by animateOp01Color(if (isCurrent) colors.borderHardware else colors.borderInset, "seg-border")
             val animShadow by animateDpAsState(
                 if (isCurrent) 2.dp else 0.dp, Op01Motion.fast(), label = "seg-shadow",
             )

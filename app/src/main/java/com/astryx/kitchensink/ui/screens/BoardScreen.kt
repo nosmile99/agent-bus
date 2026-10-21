@@ -1,6 +1,5 @@
 package com.astryx.kitchensink.ui.screens
 
-import androidx.compose.animation.core.animateColorAsState
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -37,6 +36,7 @@ import com.astryx.kitchensink.ui.components.EnterItem
 import com.astryx.kitchensink.ui.components.HwInset
 import com.astryx.kitchensink.ui.components.HwText
 import com.astryx.kitchensink.ui.components.Op01Motion
+import com.astryx.kitchensink.ui.components.animateOp01Color
 import com.astryx.kitchensink.ui.components.TaskCard
 import com.astryx.kitchensink.ui.components.hardShadow
 import com.astryx.kitchensink.ui.state.Op01State
@@ -146,18 +146,9 @@ fun BoardScreen(
         ) {
             statuses.forEachIndexed { index, status ->
                 val active = pagerState.currentPage == index
-                val animBg by animateColorAsState(
-                    if (active) colors.ink else colors.recessed,
-                    Op01Motion.color(), label = "lane-bg",
-                )
-                val animFg by animateColorAsState(
-                    if (active) colors.paper else colors.secondary,
-                    Op01Motion.color(), label = "lane-fg",
-                )
-                val animBorder by animateColorAsState(
-                    if (active) colors.borderHardware else colors.borderInset,
-                    Op01Motion.color(), label = "lane-border",
-                )
+                val animBg by animateOp01Color(if (active) colors.ink else colors.recessed, "lane-bg")
+                val animFg by animateOp01Color(if (active) colors.paper else colors.secondary, "lane-fg")
+                val animBorder by animateOp01Color(if (active) colors.borderHardware else colors.borderInset, "lane-border")
                 val animShadow by animateDpAsState(
                     if (active) 2.dp else 0.dp, Op01Motion.fast(), label = "lane-shadow",
                 )

@@ -1,7 +1,6 @@
 package com.astryx.kitchensink.ui.sheets
 
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.animateColorAsState
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.fadeIn
@@ -48,6 +47,7 @@ import com.astryx.kitchensink.ui.components.HwText
 import com.astryx.kitchensink.ui.components.HwTextField
 import com.astryx.kitchensink.ui.components.Op01Badge
 import com.astryx.kitchensink.ui.components.Op01Motion
+import com.astryx.kitchensink.ui.components.animateOp01Color
 import com.astryx.kitchensink.ui.components.QuietBadge
 import com.astryx.kitchensink.ui.components.StatusStrip
 import com.astryx.kitchensink.ui.components.hardShadow
@@ -250,18 +250,9 @@ fun TaskSheet(
                     Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                         dueOptions.forEach { option ->
                             val selected = task.due == option
-                            val animBg by animateColorAsState(
-                                if (selected) colors.ink else colors.recessed,
-                                Op01Motion.color(), label = "due-bg",
-                            )
-                            val animFg by animateColorAsState(
-                                if (selected) colors.paper else colors.secondary,
-                                Op01Motion.color(), label = "due-fg",
-                            )
-                            val animBorder by animateColorAsState(
-                                if (selected) colors.borderHardware else colors.borderInset,
-                                Op01Motion.color(), label = "due-border",
-                            )
+                            val animBg by animateOp01Color(if (selected) colors.ink else colors.recessed, "due-bg")
+                            val animFg by animateOp01Color(if (selected) colors.paper else colors.secondary, "due-fg")
+                            val animBorder by animateOp01Color(if (selected) colors.borderHardware else colors.borderInset, "due-border")
                             val animShadow by animateDpAsState(
                                 if (selected) 2.dp else 0.dp,
                                 Op01Motion.fast(), label = "due-shadow",
@@ -420,14 +411,8 @@ fun TaskSheet(
 @Composable
 private fun ChecklistRow(item: ChecklistItem, onToggle: () -> Unit) {
     val colors = Op01Theme.colors
-    val boxBg by animateColorAsState(
-        if (item.done) colors.forest else colors.card,
-        Op01Motion.color(), label = "check-bg",
-    )
-    val textColor by animateColorAsState(
-        if (item.done) colors.secondary else colors.ink,
-        Op01Motion.color(), label = "check-text",
-    )
+    val boxBg by animateOp01Color(if (item.done) colors.forest else colors.card, "check-bg")
+    val textColor by animateOp01Color(if (item.done) colors.secondary else colors.ink, "check-text")
     val checkScale by animateFloatAsState(
         targetValue = if (item.done) 1f else 0.4f,
         animationSpec = Op01Motion.snap(),

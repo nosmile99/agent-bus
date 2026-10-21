@@ -1,6 +1,5 @@
 package com.astryx.kitchensink.ui.screens
 
-import androidx.compose.animation.core.animateColorAsState
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -30,6 +29,7 @@ import com.astryx.kitchensink.ui.components.HwInset
 import com.astryx.kitchensink.ui.components.HwText
 import com.astryx.kitchensink.ui.components.Op01Badge
 import com.astryx.kitchensink.ui.components.Op01Motion
+import com.astryx.kitchensink.ui.components.animateOp01Color
 import com.astryx.kitchensink.ui.components.QuotaMeter
 import com.astryx.kitchensink.ui.components.hardShadow
 import com.astryx.kitchensink.ui.state.AgentMeta
@@ -190,18 +190,9 @@ private fun TransportOption(
     modifier: Modifier = Modifier,
 ) {
     val colors = Op01Theme.colors
-    val animBg by animateColorAsState(
-        if (selected) colors.ink else colors.recessed,
-        Op01Motion.color(), label = "transport-bg",
-    )
-    val animFg by animateColorAsState(
-        if (selected) colors.paper else colors.secondary,
-        Op01Motion.color(), label = "transport-fg",
-    )
-    val animBorder by animateColorAsState(
-        if (selected) colors.borderHardware else colors.borderInset,
-        Op01Motion.color(), label = "transport-border",
-    )
+    val animBg by animateOp01Color(if (selected) colors.ink else colors.recessed, "transport-bg")
+    val animFg by animateOp01Color(if (selected) colors.paper else colors.secondary, "transport-fg")
+    val animBorder by animateOp01Color(if (selected) colors.borderHardware else colors.borderInset, "transport-border")
     val animShadow by animateDpAsState(
         if (selected) 2.dp else 0.dp, Op01Motion.fast(), label = "transport-shadow",
     )
