@@ -365,48 +365,50 @@ fun AnimatedOp01Colors(target: Op01Colors): Op01Colors {
         label = label,
     )
     val paper by token({ paper }, "theme-paper")
+    val outer by token({ outer }, "theme-outer")
     val card by token({ card }, "theme-card")
     val recessed by token({ recessed }, "theme-recessed")
-    val ink by token({ ink }, "theme-ink")
-    val secondary by token({ secondary }, "theme-secondary")
-    val borderSoft by token({ borderSoft }, "theme-borderSoft")
-    val borderHardware by token({ borderHardware }, "theme-borderHardware")
-    val borderInset by token({ borderInset }, "theme-borderInset")
-    val shadow by token({ shadow }, "theme-shadow")
     val charcoal by token({ charcoal }, "theme-charcoal")
     val charcoalText by token({ charcoalText }, "theme-charcoalText")
-    val vermilion by token({ vermilion }, "theme-vermilion")
+    val ink by token({ ink }, "theme-ink")
+    val secondary by token({ secondary }, "theme-secondary")
+    val borderSubtle by token({ borderSubtle }, "theme-borderSubtle")
+    val borderInset by token({ borderInset }, "theme-borderInset")
+    val borderHardware by token({ borderHardware }, "theme-borderHardware")
+    val shadow by token({ shadow }, "theme-shadow")
     val forest by token({ forest }, "theme-forest")
     val ochre by token({ ochre }, "theme-ochre")
-    val headerBg by token({ headerBg }, "theme-headerBg")
-    val headerText by token({ headerText }, "theme-headerText")
-    val headerBorder by token({ headerBorder }, "theme-headerBorder")
-    val headerAlarmBg by token({ headerAlarmBg }, "theme-headerAlarmBg")
-    val feedCard by token({ feedCard }, "theme-feedCard")
-    val cautionA by token({ cautionA }, "theme-cautionA")
-    val cautionB by token({ cautionB }, "theme-cautionB")
+    val vermilion by token({ vermilion }, "theme-vermilion")
+    val cobalt by token({ cobalt }, "theme-cobalt")
+    val plum by token({ plum }, "theme-plum")
+    val led by token({ led }, "theme-led")
+    val cautionRedA by token({ cautionRedA }, "theme-cautionRedA")
+    val cautionRedB by token({ cautionRedB }, "theme-cautionRedB")
+    val cautionAmberA by token({ cautionAmberA }, "theme-cautionAmberA")
+    val cautionAmberB by token({ cautionAmberB }, "theme-cautionAmberB")
     return Op01Colors(
         paper = paper,
+        outer = outer,
         card = card,
         recessed = recessed,
-        ink = ink,
-        secondary = secondary,
-        borderSoft = borderSoft,
-        borderHardware = borderHardware,
-        borderInset = borderInset,
-        shadow = shadow,
         charcoal = charcoal,
         charcoalText = charcoalText,
-        vermilion = vermilion,
+        ink = ink,
+        secondary = secondary,
+        borderSubtle = borderSubtle,
+        borderInset = borderInset,
+        borderHardware = borderHardware,
+        shadow = shadow,
         forest = forest,
         ochre = ochre,
-        headerBg = headerBg,
-        headerText = headerText,
-        headerBorder = headerBorder,
-        headerAlarmBg = headerAlarmBg,
-        feedCard = feedCard,
-        cautionA = cautionA,
-        cautionB = cautionB,
+        vermilion = vermilion,
+        cobalt = cobalt,
+        plum = plum,
+        led = led,
+        cautionRedA = cautionRedA,
+        cautionRedB = cautionRedB,
+        cautionAmberA = cautionAmberA,
+        cautionAmberB = cautionAmberB,
         isDark = target.isDark,
     )
 }

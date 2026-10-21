@@ -24,7 +24,7 @@ class MainActivity : ComponentActivity() {
             // OP-01 is light-first: the limestone console is the default face.
             var darkTheme by rememberSaveable { mutableStateOf(false) }
             Op01Theme(darkTheme = darkTheme) {
-                // Glide every color token toward the target scheme so the
+                // Glide the color tokens toward the target scheme so the
                 // light/dark toggle never hard-cuts.
                 val animatedColors =
                     AnimatedOp01Colors(if (darkTheme) Op01DarkColors else Op01LightColors)
