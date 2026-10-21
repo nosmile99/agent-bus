@@ -53,21 +53,42 @@ export async function handleKbAdminTaskCreate(this: IBusDO, req: Request, projec
       : "normal";
   const now = this.kbNow();
   const notes = typeof payload.notes === "string" ? payload.notes : null;
+  const assignee = typeof payload.assignee === "string" && payload.assignee ? payload.assignee : null;
   this.sql.exec(
-    "INSERT INTO tasks (project_id, title, description, notes, status, priority, created_by, created_at, updated_at, status_changed_at, last_activity_at) VALUES (?, ?, ?, ?, 'todo', ?, ?, ?, ?, ?, ?)",
+    "INSERT INTO tasks (project_id, title, description, notes, status, priority, assignee, admin_assigned, claimed_at, created_by, created_at, updated_at, status_changed_at, last_activity_at) VALUES (?, ?, ?, ?, 'todo', ?, ?, ?, ?, ?, ?, ?, ?, ?)",
     projectId,
     title.trim(),
     typeof payload.description === "string" ? payload.description : null,
     notes,
     priority,
+    assignee,
+    assignee,
+    assignee ? now : null,
     this.kbBasicUser(req),
-    now,
     now,
     now,
     now,
     now
   );
   const id = (this.sql.exec("SELECT last_insert_rowid() AS id").one() as { id: number }).id;
+  if (assignee) {
+    this.emitEvent("kanban.task.assigned", {
+      actor: "admin",
+      project_id: projectId,
+      recipients: [assignee],
+      payload: {
+        task_id: id,
+        project_id: projectId,
+        assignee,
+        assigned_by: this.kbBasicUser(req),
+      },
+    });
+  }
+  if (Array.isArray(payload.labels)) {
+    for (const label of payload.labels) {
+      this.kbLabelOp(id, label, "add", "admin");
+    }
+  }
   this.emitEvent("kanban.task.created", {
     actor: "admin",
     project_id: projectId,
