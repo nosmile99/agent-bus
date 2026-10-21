@@ -166,17 +166,17 @@ fun SystemScreen(
                 HwTextField(
                     value = catalogText,
                     onValueChange = { catalogText = it },
-                    label = "Dispatch note",
+                    label = "Text field — standard",
                     placeholder = "Type like you mean it…",
                 )
                 HwTextField(
                     value = catalogMono,
                     onValueChange = { catalogMono = it },
-                    label = "Cursor (mono)",
+                    label = "Text field — mono (specimen)",
                     mono = true,
                 )
                 HwSelect(
-                    label = "Channel",
+                    label = "Select — channel (specimen)",
                     value = catalogChannel,
                     options = listOf("#kanban-do", "#all-agents", "#dm-nyx"),
                     onSelect = { catalogChannel = it },
@@ -201,10 +201,10 @@ fun SystemScreen(
         }
         item(key = "meters") {
             CatalogSection("Meters & Indicators") {
-                FieldLabel("Quota — 41% (forest)")
-                QuotaMeter(41, Modifier.fillMaxWidth())
-                FieldLabel("Quota — 88% (ochre at ≥85%)", Modifier.padding(top = 10.dp))
-                QuotaMeter(88, Modifier.fillMaxWidth())
+                FieldLabel("Quota — 30% (forest)")
+                QuotaMeter(30, Modifier.fillMaxWidth())
+                FieldLabel("Quota — 92% (ochre at ≥85%)", Modifier.padding(top = 10.dp))
+                QuotaMeter(92, Modifier.fillMaxWidth())
                 Row(
                     modifier = Modifier.padding(top = 12.dp),
                     verticalAlignment = Alignment.CenterVertically,
