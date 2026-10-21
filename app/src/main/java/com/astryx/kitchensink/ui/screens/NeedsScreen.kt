@@ -9,17 +9,20 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.astryx.kitchensink.theme.Op01Theme
 import com.astryx.kitchensink.ui.components.AgentChip
-import com.astryx.kitchensink.ui.components.CautionStripe
+import com.astryx.kitchensink.ui.components.CautionHeader
 import com.astryx.kitchensink.ui.components.EnterItem
 import com.astryx.kitchensink.ui.components.FlushCard
 import com.astryx.kitchensink.ui.components.HwButton
 import com.astryx.kitchensink.ui.components.HwButtonStyle
 import com.astryx.kitchensink.ui.components.HwCard
 import com.astryx.kitchensink.ui.components.HwText
+import com.astryx.kitchensink.ui.components.Op01Badge
 import com.astryx.kitchensink.ui.components.QuietBadge
 import com.astryx.kitchensink.ui.state.Op01State
 import com.astryx.kitchensink.ui.state.TaskStatus
@@ -64,12 +67,7 @@ fun NeedsScreen(
             EnterItem(Modifier.fillMaxWidth()) {
             FlushCard(Modifier.fillMaxWidth()) {
                 Column {
-                    CautionStripe(colors.cautionRedA, colors.cautionRedB)
-                    HwText(
-                        "⛔ Blocked — Waiting on me",
-                        Op01Theme.type.labelLg, colors.vermilion,
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp),
-                    )
+                    CautionHeader(task, Modifier.fillMaxWidth())
                     Column(Modifier.padding(12.dp)) {
                         HwText(task.title, Op01Theme.type.titleCard, colors.ink)
                         HwText(
@@ -79,10 +77,15 @@ fun NeedsScreen(
                         Row(
                             modifier = Modifier.padding(top = 10.dp),
                             horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            verticalAlignment = Alignment.CenterVertically,
                         ) {
                             QuietBadge("Task #${task.num}")
                             AgentChip(task.assignee)
+                            QuietBadge("${task.todosDone}/${task.todosTotal} todos")
                             QuietBadge(task.project)
+                            if (task.priority == "Urgent") {
+                                Op01Badge("Urgent", colors.vermilion, Color.White)
+                            }
                         }
                         Row(
                             modifier = Modifier.padding(top = 12.dp),

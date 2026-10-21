@@ -306,7 +306,7 @@ fun CautionHeader(task: BusTask, modifier: Modifier = Modifier) {
         task.status == TaskStatus.Blocked -> Column(modifier) {
             CautionStripe(colors.cautionRedA, colors.cautionRedB)
             HwText(
-                "⛔ Blocked — ${task.blockedReason.ifEmpty { "Waiting" }}",
+                "⛔ ${task.blockedReason.ifEmpty { "Waiting" }}",
                 Op01Theme.type.labelLg, colors.vermilion,
                 modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp),
             )
@@ -314,7 +314,7 @@ fun CautionHeader(task: BusTask, modifier: Modifier = Modifier) {
         task.status == TaskStatus.Doing && task.stale -> Column(modifier) {
             CautionStripe(colors.cautionAmberA, colors.cautionAmberB)
             HwText(
-                "◷ Stale (Quiet >24h)",
+                "◷ Quiet >24h",
                 Op01Theme.type.labelLg, colors.ochre,
                 modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp),
             )
