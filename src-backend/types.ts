@@ -12,6 +12,7 @@ export interface Env {
 export type TaskStatus = 'todo' | 'doing' | 'done' | 'blocked';
 export type TaskPriority = 'low' | 'normal' | 'urgent';
 export type BlockedKind = 'waiting-human' | 'waiting-task' | 'waiting-external';
+export type TaskLane = 'backend' | 'android' | 'unassigned';
 
 // Database Models
 export interface MessageRecord {
@@ -77,11 +78,14 @@ export interface TaskRecord {
   updated_at: number;
   claimed_at: number | null;
   blocked_kind?: BlockedKind | null;
+  blocked_reason?: string | null;
   status_changed_at?: number | null;
   last_activity_at?: number | null;
   stale_notified_at?: number | null;
   notes?: string | null;
   created_by?: string | null;
+  due_date?: number | null;
+  lane: TaskLane;
 }
 
 export interface TodoRecord {
@@ -104,6 +108,42 @@ export interface TaskLabelRecord {
   task_id: number;
   label: string;
 }
+
+export interface TaskTemplateRecord {
+  id: number;
+  name: string;
+  title: string;
+  description: string | null;
+  notes: string | null;
+  priority: TaskPriority;
+  lane: TaskLane;
+  labels: string;
+}
+
+export interface LaneMappingRecord {
+  agent: string;
+  lane: TaskLane;
+  set_by: string;
+  set_at: number;
+}
+
+export interface WipWarning {
+  assignee: string;
+  doing_count: number;
+  limit: number;
+}
+
+export type AutoClaimResult =
+  | {
+      ok: true;
+      autoClaimed: boolean;
+      task: TaskRecord;
+    }
+  | {
+      ok: false;
+      code: number;
+      body: Record<string, unknown>;
+    };
 
 export interface ProjectSubscriberRecord {
   project_id: number;
@@ -147,6 +187,12 @@ export interface TaskSearchOpts {
   assignee?: string | null;
   label?: string | null;
   blocked_kind?: string | null;
+  priority?: string | null;
+  lane?: string | null;
+  stale?: boolean;
+  dueDateFrom?: number | null;
+  dueDateTo?: number | null;
+  dueDateFilter?: 'overdue' | 'none' | null;
   sort?: string | null;
   includeArchived?: boolean;
   subscriberAgent?: string | null;
@@ -220,6 +266,16 @@ export interface IBusDO {
   kbSetSubscribers(projectId: number, subscribers: unknown, addedBy?: string): string[];
   kbTaskDetail(row: TaskRecord): TaskDetailResponse;
   kbTaskSearchWhere(opts: TaskSearchOpts): { where: string; params: (string | number)[]; order: string };
+  kbDefaultOrder(tableAlias?: string): string;
+  kbStartOfTodayJakarta(nowSec?: number): number;
+  kbAgentLane(agent: string): TaskLane;
+  kbLaneOwner(lane: TaskLane): string | null;
+  kbWipWarning(assignee: string | null): WipWarning | undefined;
+  kbAutoClaimOrVerify(
+    taskId: number,
+    agent: string,
+    opts?: { isStatusEndpoint?: boolean; requestedStatus?: string; requestedLane?: string }
+  ): AutoClaimResult;
   kbTodosFor(taskId: number): TodoRecord[];
   kbTaskWithTodos(row: TaskRecord): TaskWithTodos;
   kbNow(): number;
@@ -295,7 +351,6 @@ export interface IBusDO {
 
   handleAdminApiStats(req: Request): Promise<Response>;
   handleAdminApiPassword(req: Request): Promise<Response>;
-  handleAdminPanel(req: Request): Promise<Response>;
 
   handleKbAdminProjectsList(req: Request): Promise<Response>;
   handleKbAdminProjectCreate(req: Request): Promise<Response>;
@@ -315,8 +370,13 @@ export interface IBusDO {
   handleKbAgentTaskCreate(req: Request, projectId: number): Promise<Response>;
   handleKbTaskSearch(url: URL, opts: { isAdmin: boolean; agent: string | null; projectId: number | null }): Promise<Response>;
   handleKbAgentTaskDetail(req: Request, id: number): Promise<Response>;
-  handleKbAgentTaskUpdate(req: Request, id: number): Promise<Response>;
+  handleKbAgentTaskUpdate(
+    req: Request,
+    id: number,
+    onlyField?: 'notes' | 'due_date' | 'lane'
+  ): Promise<Response>;
   handleKbAgentTaskClaim(req: Request, id: number): Promise<Response>;
+  handleKbAgentTaskRelease(req: Request, id: number): Promise<Response>;
   handleKbAgentTaskStatus(req: Request, id: number): Promise<Response>;
   handleKbAgentTodoCreate(req: Request, taskId: number): Promise<Response>;
   handleKbCommentList(req: Request, url: URL, taskId: number, opts: { isAdmin: boolean; agent: string | null }): Promise<Response>;
@@ -329,4 +389,21 @@ export interface IBusDO {
   handleKbAdminTaskDetail(req: Request, id: number): Promise<Response>;
   handleKbAdminLabelAdd(req: Request, taskId: number): Promise<Response>;
   handleKbAdminLabelRemove(req: Request, taskId: number, label: string): Promise<Response>;
+
+  handleKbActivity(
+    req: Request,
+    url: URL,
+    opts: { isAdmin: boolean; agent: string | null; projectId: number | null }
+  ): Promise<Response>;
+  handleKbSummary(
+    req: Request,
+    url: URL,
+    opts: { isAdmin: boolean; agent: string | null; projectId: number | null }
+  ): Promise<Response>;
+  handleKbTemplatesList(req: Request, opts: { isAdmin: boolean }): Promise<Response>;
+  handleKbAdminTemplateCreate(req: Request): Promise<Response>;
+  handleKbAdminWipGet(req: Request): Promise<Response>;
+  handleKbAdminWipPut(req: Request): Promise<Response>;
+  handleKbAdminLaneMappingGet(req: Request): Promise<Response>;
+  handleKbAdminLaneMappingPut(req: Request): Promise<Response>;
 }

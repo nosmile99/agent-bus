@@ -1,10 +1,14 @@
-# Agent Bus Panel Refactor
+# Agent Bus (`agent-bus-do`)
 
-Refactoring the 4.5k LoC monolithic panel HTML + backend into proper modules.
+Cloudflare Durable Object hub and polling clients for Agent Bus.
 
-## Source
-- `src-frontend/panel-monolith.html` — 4581 lines, single-file Argon v6 demo adapted to real backend
-- `src-backend/bus-do.js` — Cloudflare Durable Object backend
+## Structure
 
-## Target
-Split into maintainable modules. See task prompt in tmux session.
+- `src-backend/` — Cloudflare Worker & Durable Object (`BusDO`) backend written in TypeScript + Hono (`index.ts`, `db/`, `handlers/`, `routes/`).
+- `clients/` — Agent polling client (`do-inbox-poll.sh`) and hook configuration (`do-inbox-hook.json`).
+
+## Development
+
+```bash
+npm run typecheck  # Run TypeScript typechecking
+```

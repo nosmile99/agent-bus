@@ -15,6 +15,24 @@ export function createKanbanRouter(bus: IBusDO): Hono {
     bus.handleKbAdminProjectDelete(c.req.raw, parseInt(c.req.param('id'), 10))
   );
 
+  router.get('/admin/api/kanban/summary', async (c) => {
+    if (!(await bus.checkBasicAuth(c.req.raw))) return bus.unauthorizedBasic(c.req.raw);
+    return bus.handleKbSummary(c.req.raw, new URL(c.req.url), {
+      isAdmin: true,
+      agent: null,
+      projectId: null,
+    });
+  });
+
+  router.get('/admin/api/kanban/projects/:id{[0-9]+}/summary', async (c) => {
+    if (!(await bus.checkBasicAuth(c.req.raw))) return bus.unauthorizedBasic(c.req.raw);
+    return bus.handleKbSummary(c.req.raw, new URL(c.req.url), {
+      isAdmin: true,
+      agent: null,
+      projectId: parseInt(c.req.param('id'), 10),
+    });
+  });
+
   router.get('/admin/api/kanban/projects/:id{[0-9]+}/tasks', (c) =>
     bus.handleKbAdminTasksList(c.req.raw, parseInt(c.req.param('id'), 10))
   );
@@ -49,6 +67,16 @@ export function createKanbanRouter(bus: IBusDO): Hono {
     bus.handleKbAgentTaskCreate(c.req.raw, parseInt(c.req.param('id'), 10))
   );
 
+  router.get('/api/kanban/projects/:id{[0-9]+}/summary', (c) => {
+    const agent = bus.authedAgent(c.req.raw);
+    if (!agent) return bus.json(401, { error: 'unauthorized' });
+    return bus.handleKbSummary(c.req.raw, new URL(c.req.url), {
+      isAdmin: false,
+      agent,
+      projectId: parseInt(c.req.param('id'), 10),
+    });
+  });
+
   router.get('/api/kanban/projects/:id{[0-9]+}/tasks/search', (c) => {
     const agent = bus.authedAgent(c.req.raw);
     if (!agent) return bus.json(401, { error: 'unauthorized' });
@@ -59,14 +87,38 @@ export function createKanbanRouter(bus: IBusDO): Hono {
     });
   });
 
+  router.get('/api/kanban/projects/:id{[0-9]+}/activity', (c) => {
+    const agent = bus.authedAgent(c.req.raw);
+    if (!agent) return bus.json(401, { error: 'unauthorized' });
+    return bus.handleKbActivity(c.req.raw, new URL(c.req.url), {
+      isAdmin: false,
+      agent,
+      projectId: parseInt(c.req.param('id'), 10),
+    });
+  });
+
+  router.get('/api/kanban/templates', (c) => bus.handleKbTemplatesList(c.req.raw, { isAdmin: false }));
+
   router.get('/api/kanban/tasks/:id{[0-9]+}', (c) =>
     bus.handleKbAgentTaskDetail(c.req.raw, parseInt(c.req.param('id'), 10))
   );
   router.put('/api/kanban/tasks/:id{[0-9]+}', (c) =>
     bus.handleKbAgentTaskUpdate(c.req.raw, parseInt(c.req.param('id'), 10))
   );
+  router.put('/api/kanban/tasks/:id{[0-9]+}/notes', (c) =>
+    bus.handleKbAgentTaskUpdate(c.req.raw, parseInt(c.req.param('id'), 10), 'notes')
+  );
+  router.put('/api/kanban/tasks/:id{[0-9]+}/due_date', (c) =>
+    bus.handleKbAgentTaskUpdate(c.req.raw, parseInt(c.req.param('id'), 10), 'due_date')
+  );
+  router.put('/api/kanban/tasks/:id{[0-9]+}/lane', (c) =>
+    bus.handleKbAgentTaskUpdate(c.req.raw, parseInt(c.req.param('id'), 10), 'lane')
+  );
   router.post('/api/kanban/tasks/:id{[0-9]+}/claim', (c) =>
     bus.handleKbAgentTaskClaim(c.req.raw, parseInt(c.req.param('id'), 10))
+  );
+  router.post('/api/kanban/tasks/:id{[0-9]+}/release', (c) =>
+    bus.handleKbAgentTaskRelease(c.req.raw, parseInt(c.req.param('id'), 10))
   );
   router.put('/api/kanban/tasks/:id{[0-9]+}/status', (c) =>
     bus.handleKbAgentTaskStatus(c.req.raw, parseInt(c.req.param('id'), 10))
@@ -103,7 +155,7 @@ export function createKanbanRouter(bus: IBusDO): Hono {
     bus.handleKbAgentTodoUpdate(c.req.raw, parseInt(c.req.param('id'), 10))
   );
 
-  // Kanban expansion: admin search / labels / subscribers / task detail
+  // Kanban expansion: admin search / labels / subscribers / task detail / activity / templates / wip / lane-mapping
   router.get('/admin/api/kanban/tasks/search', async (c) => {
     if (!(await bus.checkBasicAuth(c.req.raw))) return bus.unauthorizedBasic(c.req.raw);
     return bus.handleKbTaskSearch(new URL(c.req.url), { isAdmin: true, agent: null, projectId: null });
@@ -117,6 +169,24 @@ export function createKanbanRouter(bus: IBusDO): Hono {
       projectId: parseInt(c.req.param('id'), 10),
     });
   });
+
+  router.get('/admin/api/kanban/activity', async (c) => {
+    if (!(await bus.checkBasicAuth(c.req.raw))) return bus.unauthorizedBasic(c.req.raw);
+    return bus.handleKbActivity(c.req.raw, new URL(c.req.url), {
+      isAdmin: true,
+      agent: null,
+      projectId: null,
+    });
+  });
+
+  router.get('/admin/api/kanban/templates', (c) => bus.handleKbTemplatesList(c.req.raw, { isAdmin: true }));
+  router.post('/admin/api/kanban/templates', (c) => bus.handleKbAdminTemplateCreate(c.req.raw));
+
+  router.get('/admin/api/kanban/wip', (c) => bus.handleKbAdminWipGet(c.req.raw));
+  router.put('/admin/api/kanban/wip', (c) => bus.handleKbAdminWipPut(c.req.raw));
+
+  router.get('/admin/api/kanban/lane-mapping', (c) => bus.handleKbAdminLaneMappingGet(c.req.raw));
+  router.put('/admin/api/kanban/lane-mapping', (c) => bus.handleKbAdminLaneMappingPut(c.req.raw));
 
   router.get('/admin/api/kanban/projects/:id{[0-9]+}/labels', (c) =>
     bus.handleKbAdminProjectLabels(c.req.raw, parseInt(c.req.param('id'), 10))

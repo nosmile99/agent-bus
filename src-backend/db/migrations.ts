@@ -111,6 +111,85 @@ export function migrateV4(bus: IBusDO): void {
   }
 }
 
+export function migrateV6(bus: IBusDO): void {
+  // Version-insert ownership, locked: runMigrations owns sequencing (it calls
+  // migrateV6 only after v5), migrateV6 owns its own version insert, inside
+  // bus.state.storage.transactionSync(...) on success only.
+  // NOTE: Cloudflare Durable Objects SqlStorage forbids raw SQL "BEGIN" / "COMMIT" /
+  // "ROLLBACK" inside sql.exec(); transactionSync() is the required DO primitive
+  // that atomically commits on normal return and rolls back all writes on throw.
+  const addColIfMissing = (table: 'tasks', column: string, ddl: string) => {
+    const rows = bus.sql
+      .exec(`SELECT 1 FROM pragma_table_info('${table}') WHERE name = ? LIMIT 1`, column)
+      .toArray();
+    if (rows.length === 0) {
+      bus.sql.exec(ddl);
+    }
+  };
+  bus.state.storage.transactionSync(() => {
+    addColIfMissing(`tasks`, `due_date`, `ALTER TABLE tasks ADD COLUMN due_date INTEGER`);
+    addColIfMissing(
+      `tasks`,
+      `lane`,
+      `ALTER TABLE tasks ADD COLUMN lane TEXT NOT NULL DEFAULT 'unassigned' CHECK (lane IN ('backend', 'android', 'unassigned'))`
+    );
+    addColIfMissing(`tasks`, `blocked_reason`, `ALTER TABLE tasks ADD COLUMN blocked_reason TEXT`);
+
+    bus.sql.exec(`CREATE INDEX IF NOT EXISTS idx_tasks_due ON tasks(due_date)`);
+    bus.sql.exec(`CREATE INDEX IF NOT EXISTS idx_tasks_lane ON tasks(lane)`);
+
+    bus.sql.exec(`CREATE TABLE IF NOT EXISTS task_templates (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL UNIQUE,
+      title TEXT NOT NULL,
+      description TEXT,
+      notes TEXT,
+      priority TEXT NOT NULL DEFAULT 'normal' CHECK (priority IN ('low', 'normal', 'urgent')),
+      lane TEXT NOT NULL CHECK (lane IN ('backend', 'android', 'unassigned')),
+      labels TEXT NOT NULL DEFAULT '[]'
+    )`);
+
+    bus.sql.exec(`CREATE TABLE IF NOT EXISTS kanban_wip_config (
+      id INTEGER PRIMARY KEY CHECK (id = 1),
+      per_assignee_doing_limit INTEGER
+    )`);
+
+    bus.sql.exec(`CREATE TABLE IF NOT EXISTS lane_mapping (
+      agent TEXT PRIMARY KEY,
+      lane TEXT NOT NULL CHECK (lane IN ('backend', 'android', 'unassigned')),
+      set_by TEXT NOT NULL,
+      set_at INTEGER NOT NULL
+    )`);
+
+    const now = Math.floor(Date.now() / 1000);
+    bus.sql.exec(`UPDATE tasks SET lane = 'unassigned' WHERE lane IS NULL`);
+
+    bus.sql.exec(
+      `INSERT OR IGNORE INTO lane_mapping (agent, lane, set_by, set_at) VALUES
+        ('nyx', 'backend', 'system', ?),
+        ('nosmile99', 'android', 'system', ?),
+        ('wren', 'unassigned', 'system', ?),
+        ('luki', 'unassigned', 'system', ?)`,
+      now,
+      now,
+      now,
+      now
+    );
+
+    bus.sql.exec(
+      `INSERT OR IGNORE INTO task_templates (name, title, description, notes, priority, lane, labels) VALUES
+        ('backend-audit-finding', '[audit] {finding}', 'Audit finding, see comment for evidence', '', 'normal', 'backend', '["audit"]'),
+        ('android-audit-finding', '[audit] {finding}', 'Audit finding, see comment for evidence', '', 'normal', 'android', '["audit","android"]'),
+        ('backend-feature', '{feature}', '', '', 'normal', 'backend', '[]'),
+        ('android-feature', '{feature}', '', '', 'normal', 'android', '["android"]')`
+    );
+
+    // Version 6 is recorded ONLY here, inside the same transactionSync block, on success.
+    // Any thrown error aborts transactionSync and rolls back all DDL + version 6 insert.
+    bus.sql.exec(`INSERT INTO schema_migrations (version, applied_at) VALUES (6, strftime('%s','now'))`);
+  });
+}
+
 export async function runMigrations(bus: IBusDO): Promise<void> {
   bus.sql.exec(`CREATE TABLE IF NOT EXISTS messages (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -216,6 +295,10 @@ export async function runMigrations(bus: IBusDO): Promise<void> {
     }
     bus.sql.exec(`INSERT INTO schema_migrations (version, applied_at) VALUES (5, ?)`, migNow());
     schemaV = 5;
+  }
+  if (schemaV < 6) {
+    migrateV6(bus);
+    schemaV = 6;
   }
   try {
     await bus.state.storage.setAlarm(Date.now() + 5 * 60 * 1000);

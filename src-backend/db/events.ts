@@ -1,5 +1,13 @@
 // Unified-poll event emission & kanban event helpers
-import type { IBusDO, TaskRecord, TaskDetailResponse, TaskSearchOpts } from '../types.js';
+import type {
+  IBusDO,
+  TaskRecord,
+  TaskDetailResponse,
+  TaskSearchOpts,
+  TaskLane,
+  WipWarning,
+  AutoClaimResult,
+} from '../types.js';
 
 export function emitEvent(
   this: IBusDO,
@@ -110,7 +118,7 @@ export function kbSetSubscribers(this: IBusDO, projectId: number, subscribers: u
   return clean;
 }
 
-// Task detail payload (kanban rev 4): labels, comment/activity counts, todos.
+// Task detail payload (kanban rev 4/5): labels, comment/activity counts, todos.
 export function kbTaskDetail(this: IBusDO, row: TaskRecord): TaskDetailResponse {
   let labels: string[] = [];
   let comment_count = 0;
@@ -133,9 +141,202 @@ export function kbTaskDetail(this: IBusDO, row: TaskRecord): TaskDetailResponse 
   return { ...this.kbTaskWithTodos(row), labels, comment_count, activity_count };
 }
 
-// Shared task search builder. opts: {projectIds (array|null=all), q, status,
-// assignee, label, blocked_kind, sort, includeArchived, subscriberAgent}.
-// Returns {where, params, order} for "... FROM tasks WHERE <where>".
+// Locked default sort (§2E.3): due_date ASC NULLS LAST, priority DESC (urgent > normal > low), created_at ASC, id ASC.
+export function kbDefaultOrder(tableAlias = "tasks"): string {
+  const t = tableAlias;
+  return `CASE WHEN ${t}.due_date IS NULL THEN 1 ELSE 0 END ASC, ${t}.due_date ASC, CASE ${t}.priority WHEN 'urgent' THEN 3 WHEN 'normal' THEN 2 WHEN 'low' THEN 1 ELSE 0 END DESC, ${t}.created_at ASC, ${t}.id ASC`;
+}
+
+// Start of current day (00:00:00) in Asia/Jakarta (UTC+07:00, fixed offset +25200s) as UTC epoch seconds (§2C.1).
+export function kbStartOfTodayJakarta(this: IBusDO, nowSec?: number): number {
+  const now = nowSec !== undefined ? nowSec : this.kbNow();
+  const JAKARTA_OFFSET = 7 * 3600;
+  return Math.floor((now + JAKARTA_OFFSET) / 86400) * 86400 - JAKARTA_OFFSET;
+}
+
+// Look up the mapped lane for an agent from lane_mapping (§Lane split / §2G). Defaults to 'unassigned'.
+export function kbAgentLane(this: IBusDO, agent: string): TaskLane {
+  try {
+    const rows = this.sql
+      .exec(`SELECT lane FROM lane_mapping WHERE agent = ?`, agent)
+      .toArray() as Array<{ lane: TaskLane }>;
+    const lane = rows[0]?.lane;
+    if (lane === "backend" || lane === "android" || lane === "unassigned") return lane;
+  } catch {}
+  return "unassigned";
+}
+
+// Look up the agent mapped as owner of a given lane ('backend' or 'android'). Returns null for 'unassigned' or if unmapped.
+export function kbLaneOwner(this: IBusDO, lane: TaskLane): string | null {
+  if (lane === "unassigned") return null;
+  try {
+    const rows = this.sql
+      .exec(`SELECT agent FROM lane_mapping WHERE lane = ? ORDER BY agent ASC LIMIT 1`, lane)
+      .toArray() as Array<{ agent: string }>;
+    return rows[0]?.agent ?? null;
+  } catch {
+    return null;
+  }
+}
+
+// Per-assignee doing WIP warning (§2F.4). Returns undefined if no limit configured or doing_count < limit.
+export function kbWipWarning(this: IBusDO, assignee: string | null): WipWarning | undefined {
+  if (!assignee) return undefined;
+  try {
+    const cfgRows = this.sql
+      .exec(`SELECT per_assignee_doing_limit FROM kanban_wip_config WHERE id = 1`)
+      .toArray() as Array<{ per_assignee_doing_limit: number | null }>;
+    const limit = cfgRows[0]?.per_assignee_doing_limit;
+    if (typeof limit !== "number" || !Number.isInteger(limit) || limit < 1) return undefined;
+    const countRow = this.sql
+      .exec(
+        `SELECT COUNT(*) AS c FROM tasks t
+         WHERE t.assignee = ? AND t.status = 'doing'
+           AND NOT EXISTS (SELECT 1 FROM projects p WHERE p.id = t.project_id AND p.archived = 1)`,
+        assignee
+      )
+      .one() as { c: number };
+    const doingCount = countRow?.c ?? 0;
+    if (doingCount >= limit) {
+      return { assignee, doing_count: doingCount, limit };
+    }
+  } catch {}
+  return undefined;
+}
+
+// Shared auto-claim / ownership verification step (§2A.1–2).
+// Must be invoked inside bus.state.storage.transactionSync(...) when mutating.
+export function kbAutoClaimOrVerify(
+  this: IBusDO,
+  taskId: number,
+  agent: string,
+  opts?: { isStatusEndpoint?: boolean; requestedStatus?: string; requestedLane?: string }
+): AutoClaimResult {
+  const rows = this.sql
+    .exec(
+      `SELECT t.*, p.archived AS project_archived
+       FROM tasks t JOIN projects p ON p.id = t.project_id
+       WHERE t.id = ?`,
+      taskId
+    )
+    .toArray() as unknown as Array<TaskRecord & { project_archived: number }>;
+  const row = rows[0];
+  if (!row) {
+    return { ok: false, code: 404, body: { error: "task not found" } };
+  }
+
+  // Already owned by calling agent: verify project is not archived.
+  if (row.assignee === agent) {
+    if (row.project_archived) {
+      return { ok: false, code: 403, body: { error: "project archived" } };
+    }
+    return { ok: true, autoClaimed: false, task: row };
+  }
+
+  // Check subscriber predicate and archived gate BEFORE any task-state-dependent 400/409
+  // so restricted projects never leak task state (§2A.2 & Amendment A3).
+  const subCheck = this.sql
+    .exec(
+      `SELECT 1 FROM projects WHERE id = ? AND ${this.kbSubscriberPred("projects.id")}`,
+      row.project_id,
+      agent
+    )
+    .toArray();
+  if (subCheck.length === 0) {
+    return { ok: false, code: 403, body: { error: "auto_claim_failed", reason: "project_not_readable" } };
+  }
+  if (row.project_archived) {
+    return { ok: false, code: 403, body: { error: "auto_claim_failed", reason: "project_archived" } };
+  }
+
+  // Special rule for PUT .../status: cannot auto-claim an unassigned task into 'todo' (§2A.2).
+  if (row.assignee === null && opts?.isStatusEndpoint && opts.requestedStatus === "todo") {
+    return { ok: false, code: 400, body: { error: "cannot_auto_claim_to_todo" } };
+  }
+
+  const agentLane = this.kbAgentLane(agent);
+  const tryingOtherLane =
+    row.assignee === null &&
+    opts?.requestedLane !== undefined &&
+    opts.requestedLane !== agentLane;
+
+  if (row.assignee === null && !tryingOtherLane) {
+    const now = this.kbNow();
+    const res = this.sql.exec(
+      `UPDATE tasks
+       SET assignee = ?, status = 'doing', claimed_at = ?, status_changed_at = ?, updated_at = ?, last_activity_at = ?,
+           lane = CASE WHEN lane = 'unassigned' THEN ? ELSE lane END
+       WHERE id = ?
+         AND assignee IS NULL
+         AND (admin_assigned IS NULL OR admin_assigned = ?)
+         AND status = 'todo'
+         AND NOT EXISTS (SELECT 1 FROM projects p WHERE p.id = tasks.project_id AND p.archived = 1)
+         AND ${this.kbSubscriberPred("tasks.project_id")}
+         AND (lane = 'unassigned' OR lane = ?)`,
+      agent,
+      now,
+      now,
+      now,
+      now,
+      agentLane,
+      taskId,
+      agent,
+      agent,
+      agentLane
+    ) as { rowsWritten?: number };
+
+    if ((res.rowsWritten ?? 0) === 1) {
+      const updated = (
+        this.sql.exec(`SELECT * FROM tasks WHERE id = ?`, taskId).toArray() as unknown as TaskRecord[]
+      )[0]!;
+      this.kbSystemLog(taskId, `${agent} auto-claimed the task`);
+      this.emitEvent("kanban.task.claimed", {
+        actor: agent,
+        project_id: updated.project_id,
+        payload: {
+          id: taskId,
+          task_id: taskId,
+          claimant: agent,
+          assignee: agent,
+          auto: true,
+          lane: updated.lane,
+        },
+      });
+      return { ok: true, autoClaimed: true, task: updated };
+    }
+  }
+
+  // Auto-claim did not match (or task already owned by another agent).
+  // Subscriber predicate and archived gate were already verified above.
+  let reason: "already_claimed" | "admin_locked" | "invalid_status" | "wrong_lane";
+  if (row.assignee !== null && row.assignee !== agent) {
+    reason = "already_claimed";
+  } else if (row.admin_assigned !== null && row.admin_assigned !== agent) {
+    reason = "admin_locked";
+  } else if (row.status !== "todo") {
+    reason = "invalid_status";
+  } else {
+    reason = "wrong_lane";
+  }
+
+  return {
+    ok: false,
+    code: 409,
+    body: {
+      error: "auto_claim_failed",
+      reason,
+      current: {
+        assignee: row.assignee,
+        admin_assigned: row.admin_assigned,
+        status: row.status,
+        lane: row.lane,
+      },
+    },
+  };
+}
+
+// Shared task search builder (§2E.2–3).
+// Returns {where, params, order} for "... FROM tasks WHERE <where> ORDER BY <order>".
 export function kbTaskSearchWhere(
   this: IBusDO,
   opts: TaskSearchOpts
@@ -150,20 +351,51 @@ export function kbTaskSearchWhere(
     conds.push(`NOT EXISTS (SELECT 1 FROM projects p WHERE p.id = tasks.project_id AND p.archived = 1)`);
   }
   if (opts.q) {
-    conds.push(`(tasks.title LIKE ? OR tasks.description LIKE ?)`);
-    params.push(`%${opts.q}%`, `%${opts.q}%`);
+    // Phase 1 fix 1: search title, description, AND notes.
+    conds.push(`(tasks.title LIKE ? OR tasks.description LIKE ? OR tasks.notes LIKE ?)`);
+    params.push(`%${opts.q}%`, `%${opts.q}%`, `%${opts.q}%`);
   }
   if (opts.status) {
     conds.push(`tasks.status = ?`);
     params.push(opts.status);
   }
   if (opts.assignee) {
-    conds.push(`tasks.assignee = ?`);
-    params.push(opts.assignee);
+    if (opts.assignee === "unassigned") {
+      conds.push(`tasks.assignee IS NULL`);
+    } else {
+      conds.push(`tasks.assignee = ?`);
+      params.push(opts.assignee);
+    }
   }
   if (opts.blocked_kind) {
     conds.push(`tasks.blocked_kind = ?`);
     params.push(opts.blocked_kind);
+  }
+  if (opts.priority) {
+    conds.push(`tasks.priority = ?`);
+    params.push(opts.priority);
+  }
+  if (opts.lane) {
+    conds.push(`tasks.lane = ?`);
+    params.push(opts.lane);
+  }
+  if (opts.stale) {
+    conds.push(`tasks.status = 'doing' AND tasks.last_activity_at < ?`);
+    params.push(this.kbNow() - 86400);
+  }
+  if (opts.dueDateFrom !== undefined && opts.dueDateFrom !== null) {
+    conds.push(`tasks.due_date IS NOT NULL AND tasks.due_date >= ?`);
+    params.push(opts.dueDateFrom);
+  }
+  if (opts.dueDateTo !== undefined && opts.dueDateTo !== null) {
+    conds.push(`tasks.due_date IS NOT NULL AND tasks.due_date <= ?`);
+    params.push(opts.dueDateTo);
+  }
+  if (opts.dueDateFilter === "overdue") {
+    conds.push(`tasks.due_date IS NOT NULL AND tasks.due_date < ? AND tasks.status != 'done'`);
+    params.push(this.kbStartOfTodayJakarta());
+  } else if (opts.dueDateFilter === "none") {
+    conds.push(`tasks.due_date IS NULL`);
   }
   if (opts.label) {
     conds.push(`EXISTS (SELECT 1 FROM task_labels tl WHERE tl.task_id = tasks.id AND tl.label = ?)`);
@@ -173,7 +405,9 @@ export function kbTaskSearchWhere(
     conds.push(this.kbSubscriberPred("tasks.project_id"));
     params.push(opts.subscriberAgent);
   }
-  let order = `tasks.id ASC`;
-  if (opts.sort === "blocked_since") order = `tasks.status_changed_at ASC`;
+  let order = this.kbDefaultOrder("tasks");
+  if (opts.sort === "blocked_since") {
+    order = `tasks.status_changed_at ASC, tasks.id ASC`;
+  }
   return { where: conds.length ? conds.join(" AND ") : "1=1", params, order };
 }
