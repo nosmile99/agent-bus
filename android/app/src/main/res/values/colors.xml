@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="ledger_paper">#FFF6F4EE</color>
+    <color name="signal_vermilion">#FFB83214</color>
+    <color name="carbon_ink">#FF141619</color>
+</resources>
