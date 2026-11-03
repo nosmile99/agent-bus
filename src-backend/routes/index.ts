@@ -7,6 +7,8 @@ import { createAgentsRouter } from './agents.js';
 import { createAdminRouter } from './admin.js';
 import { createChannelsRouter } from './channels.js';
 import { createKanbanRouter } from './kanban.js';
+import { createLedgerRouter } from './ledger.js';
+import { createWakeRouter } from './wake.js';
 
 export function createRouter(bus: IBusDO) {
   const app = new Hono()
@@ -15,7 +17,9 @@ export function createRouter(bus: IBusDO) {
     .route('/', createAgentsRouter(bus))
     .route('/', createAdminRouter(bus))
     .route('/', createChannelsRouter(bus))
-    .route('/', createKanbanRouter(bus));
+    .route('/', createKanbanRouter(bus))
+    .route('/', createLedgerRouter(bus))
+    .route('/', createWakeRouter(bus));
 
   app.notFound(() => bus.json(404, { error: 'not found' }));
   app.onError((err) =>

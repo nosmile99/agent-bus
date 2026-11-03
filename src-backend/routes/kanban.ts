@@ -47,6 +47,15 @@ export function createKanbanRouter(bus: IBusDO): Hono {
     bus.handleKbAdminTaskDelete(c.req.raw, parseInt(c.req.param('id'), 10))
   );
 
+  // Amendment batch item 12: atomic rescue (admin Basic variant).
+  // NOTE (cross-file wiring, parent): handleKbTaskRescue is exported
+  // from handlers/kanban.ts and auto-bound onto BusDO by index.ts,
+  // but IBusDO (types.ts) and the BusDO field list (index.ts) need
+  // a one-line handleKbTaskRescue declaration each for tsc.
+  router.post('/admin/api/kanban/tasks/:id{[0-9]+}/rescue', (c) =>
+    bus.handleKbTaskRescue(c.req.raw, parseInt(c.req.param('id'), 10), { isAdmin: true, agent: null })
+  );
+
   router.post('/admin/api/kanban/tasks/:id{[0-9]+}/todos', (c) =>
     bus.handleKbAdminTodoCreate(c.req.raw, parseInt(c.req.param('id'), 10))
   );
@@ -99,6 +108,27 @@ export function createKanbanRouter(bus: IBusDO): Hono {
 
   router.get('/api/kanban/templates', (c) => bus.handleKbTemplatesList(c.req.raw, { isAdmin: false }));
 
+  router.get('/api/kanban/tasks/unblocked', (c) =>
+    bus.handleDepUnblocked(c.req.raw, new URL(c.req.url), { isAdmin: false, agent: null })
+  );
+  router.get('/api/kanban/tasks/:id{[0-9]+}/dependencies', (c) =>
+    bus.handleDepList(c.req.raw, parseInt(c.req.param('id'), 10), { isAdmin: false, agent: null })
+  );
+  router.get('/api/kanban/tasks/:id{[0-9]+}/dependencies/events', (c) =>
+    bus.handleDepEvents(c.req.raw, parseInt(c.req.param('id'), 10), { isAdmin: false, agent: null })
+  );
+  router.post('/api/kanban/tasks/:id{[0-9]+}/dependencies', (c) =>
+    bus.handleDepLink(c.req.raw, parseInt(c.req.param('id'), 10), { isAdmin: false, agent: null })
+  );
+  router.delete('/api/kanban/tasks/:id{[0-9]+}/dependencies/:blocker_id{[0-9]+}', (c) =>
+    bus.handleDepUnlink(
+      c.req.raw,
+      parseInt(c.req.param('id'), 10),
+      parseInt(c.req.param('blocker_id'), 10),
+      { isAdmin: false, agent: null }
+    )
+  );
+
   router.get('/api/kanban/tasks/:id{[0-9]+}', (c) =>
     bus.handleKbAgentTaskDetail(c.req.raw, parseInt(c.req.param('id'), 10))
   );
@@ -123,6 +153,10 @@ export function createKanbanRouter(bus: IBusDO): Hono {
   router.put('/api/kanban/tasks/:id{[0-9]+}/status', (c) =>
     bus.handleKbAgentTaskStatus(c.req.raw, parseInt(c.req.param('id'), 10))
   );
+  // Amendment batch item 12: atomic rescue (agent Bearer variant).
+  router.post('/api/kanban/tasks/:id{[0-9]+}/rescue', (c) =>
+    bus.handleKbTaskRescue(c.req.raw, parseInt(c.req.param('id'), 10), { isAdmin: false, agent: null })
+  );
   router.post('/api/kanban/tasks/:id{[0-9]+}/todos', (c) =>
     bus.handleKbAgentTodoCreate(c.req.raw, parseInt(c.req.param('id'), 10))
   );
@@ -144,6 +178,19 @@ export function createKanbanRouter(bus: IBusDO): Hono {
       agent,
     });
   });
+
+  // Amendment batch item 22: comment restore (author Bearer).
+  router.post('/api/kanban/tasks/:id{[0-9]+}/comments/:comment_id{[0-9]+}/restore', (c) => {
+    const agent = bus.authedAgent(c.req.raw);
+    if (!agent) return bus.json(401, { error: 'unauthorized' });
+    return bus.handleKbCommentRestore(c.req.raw, parseInt(c.req.param('id'), 10), parseInt(c.req.param('comment_id'), 10), {
+      isAdmin: false,
+      agent,
+    });
+  });
+
+  // Amendment batch item 25: caller-visible sweep health.
+  router.get('/api/kanban/sweep-health', (c) => bus.handleKbAgentSweepHealth(c.req.raw));
 
   router.post('/api/kanban/tasks/:id{[0-9]+}/labels', (c) =>
     bus.handleKbAgentLabelAdd(c.req.raw, parseInt(c.req.param('id'), 10))
@@ -194,6 +241,42 @@ export function createKanbanRouter(bus: IBusDO): Hono {
   router.get('/admin/api/kanban/projects/:id{[0-9]+}/subscribers', (c) =>
     bus.handleKbAdminProjectSubscribers(c.req.raw, parseInt(c.req.param('id'), 10))
   );
+  router.get('/admin/api/kanban/tasks/unblocked', (c) =>
+    bus.handleDepUnblocked(c.req.raw, new URL(c.req.url), { isAdmin: true, agent: null })
+  );
+  router.get('/admin/api/kanban/tasks/:id{[0-9]+}/dependencies', (c) =>
+    bus.handleDepList(c.req.raw, parseInt(c.req.param('id'), 10), { isAdmin: true, agent: null })
+  );
+  router.get('/admin/api/kanban/tasks/:id{[0-9]+}/dependencies/events', (c) =>
+    bus.handleDepEvents(c.req.raw, parseInt(c.req.param('id'), 10), { isAdmin: true, agent: null })
+  );
+  router.post('/admin/api/kanban/tasks/:id{[0-9]+}/dependencies', (c) =>
+    bus.handleDepLink(c.req.raw, parseInt(c.req.param('id'), 10), { isAdmin: true, agent: null })
+  );
+  router.delete('/admin/api/kanban/tasks/:id{[0-9]+}/dependencies/:blocker_id{[0-9]+}', (c) =>
+    bus.handleDepUnlink(
+      c.req.raw,
+      parseInt(c.req.param('id'), 10),
+      parseInt(c.req.param('blocker_id'), 10),
+      { isAdmin: true, agent: null }
+    )
+  );
+  router.post('/admin/api/kanban/tasks/:id{[0-9]+}/comments/:comment_id{[0-9]+}/soft-delete', (c) =>
+    bus.handleKbCommentSoftDelete(
+      c.req.raw,
+      parseInt(c.req.param('id'), 10),
+      parseInt(c.req.param('comment_id'), 10)
+    )
+  );
+
+  // Amendment batch item 22: comment restore (admin Basic).
+  router.post('/admin/api/kanban/tasks/:id{[0-9]+}/comments/:comment_id{[0-9]+}/restore', (c) =>
+    bus.handleKbCommentRestore(c.req.raw, parseInt(c.req.param('id'), 10), parseInt(c.req.param('comment_id'), 10), {
+      isAdmin: true,
+      agent: null,
+    })
+  );
+
   router.get('/admin/api/kanban/tasks/:id{[0-9]+}', (c) =>
     bus.handleKbAdminTaskDetail(c.req.raw, parseInt(c.req.param('id'), 10))
   );

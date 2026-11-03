@@ -86,6 +86,13 @@ export interface TaskRecord {
   created_by?: string | null;
   due_date?: number | null;
   lane: TaskLane;
+  blocked_from_status?: string | null;
+  unblocked_at?: number | null;
+  // Argon safety round (migration v10): the blocker whose completion,
+  // unlink, or deletion freed this task. Internal storage column —
+  // read sites strip it and expose the gated public field
+  // freeing_blocker_id instead (null unless unblocked_at is set).
+  unblocked_by_blocker_id?: number | null;
 }
 
 export interface TodoRecord {
@@ -172,12 +179,88 @@ export interface WebSocketAttachment {
 // Composite & API types
 export interface TaskWithTodos extends TaskRecord {
   todos: TodoRecord[];
+  // Argon safety round: public freeing-blocker field, gated on
+  // unblocked_at (see the unblocked_by_blocker_id note above).
+  freeing_blocker_id?: number | null;
 }
 
 export interface TaskDetailResponse extends TaskWithTodos {
   labels: string[];
   comment_count: number;
   activity_count: number;
+  count_note?: string;
+  dependencies: {
+    blockers: Array<{ id: number; title: string; status: TaskStatus; blocked_kind: string | null; blocked_reason: string | null; unfinished: boolean }>;
+    blocked_by: Array<{ id: number; title: string; status: TaskStatus; unfinished: boolean }>;
+  };
+  ledger_refs: Array<{
+    id: number;
+    kind: string;
+    title: string;
+    scope: string;
+    target_lane: string | null;
+    provenance_type?: string | null;
+    body_excerpt?: string;
+  }>;
+  // Capped list: ledger_refs holds at most 20 rows (fetch-21 pattern,
+  // see kbTaskDetail); ledger_refs_has_more says whether more exist.
+  // ledger_ref_count is the TOTAL filtered active count per locked
+  // plan §6 and SPEC, NOT the returned-refs count.
+  // Fix round 7, (f): ledger_refs_next_after_id is the
+  // continuation pointer when has_more is true — the id of the
+  // last returned ref, to pass as after_id to
+  // GET /api/ledger?ref_type=task&ref_id=<taskId> (same id-ASC
+  // order). Null when there is no next page. Previously refs 21+
+  // were unreachable from the detail payload (the workaround
+  // existed but was pointed at nowhere).
+  ledger_ref_count: number;
+  ledger_refs_has_more?: boolean;
+  ledger_refs_next_after_id?: number | null;
+}
+
+export type LedgerKind =
+  | 'decision'
+  | 'hold'
+  | 'gate'
+  | 'protocol'
+  | 'handover'
+  | 'dead-end'
+  | 'dissent';
+export type LedgerScope = 'action' | 'lane-note';
+export type LedgerStatus = 'active' | 'superseded' | 'tombstoned';
+export type LedgerProvenance =
+  | 'bus_message'
+  | 'task'
+  | 'agent_asserted'
+  | 'luki_ordered'
+  | 'lock_ordered';
+
+export interface LedgerRecord {
+  id: number;
+  kind: LedgerKind;
+  title: string;
+  body: string;
+  author: string;
+  lane: string;
+  target_lane: string | null;
+  scope: LedgerScope;
+  status: LedgerStatus;
+  supersedes_id: number | null;
+  superseded_by_id: number | null;
+  replaces_tombstoned_id: number | null;
+  bus_reconciliation_id: number | null;
+  ref_type: string | null;
+  ref_id: string | null;
+  provenance_type: LedgerProvenance;
+  is_luki_ordered: number;
+  tombstone_reason: string | null;
+  tombstoned_by: string | null;
+  tombstoned_at: number | null;
+  recheck_at: number | null;
+  demote_actor: string | null;
+  demote_deadline: number | null;
+  created_at: number;
+  updated_at: number;
 }
 
 export interface TaskSearchOpts {
@@ -264,9 +347,43 @@ export interface IBusDO {
   kbSystemLog(taskId: number, body: string): void;
   kbProjectSubscribers(projectId: number): string[];
   kbSetSubscribers(projectId: number, subscribers: unknown, addedBy?: string): string[];
-  kbTaskDetail(row: TaskRecord): TaskDetailResponse;
+  kbTaskDetail(
+    row: TaskRecord,
+    opts?: { agent?: string | null; isAdmin?: boolean; ledgerRefsAfterId?: number | null }
+  ): TaskDetailResponse;
+  depReevaluateOnDone(blockerId: number, now: number): { processed: number; capped: boolean; pending_sweep: boolean };
+  depReblockOnReopen(blockerId: number, now: number): { processed: number; capped: boolean; pending_sweep: boolean };
+  depCascadeOnTaskDelete(taskId: number, now: number): { links_removed: number; dependents_unblocked: number; unblocked_ids: number[]; capped: boolean; pending_sweep: boolean; snapshots_truncated: boolean };
+  depCascadeOnProjectDelete(projectId: number, now: number): { links_removed: number; tasks_deleted: number };
+  depReevaluateProject(projectId: number, now: number, opts?: { uncapped?: boolean }): { unblocked: { processed: number; capped: boolean; pending_sweep: boolean }; reblocked: { processed: number; capped: boolean; pending_sweep: boolean }; capped: boolean; pending_sweep: boolean; processed: number };
+  handleDepLink(req: Request, id: number, opts: { isAdmin: boolean; agent: string | null }): Promise<Response>;
+  handleDepUnlink(req: Request, id: number, blockerId: number, opts: { isAdmin: boolean; agent: string | null }): Promise<Response>;
+  handleDepList(req: Request, id: number, opts: { isAdmin: boolean; agent: string | null }): Promise<Response>;
+  handleDepEvents(req: Request, id: number, opts: { isAdmin: boolean; agent: string | null }): Promise<Response>;
+  handleDepUnblocked(req: Request, url: URL, opts: { isAdmin: boolean; agent: string | null }): Promise<Response>;
+  handleLedgerCreate(req: Request): Promise<Response>;
+  handleLedgerList(req: Request, url: URL, opts: { isAdmin: boolean; agent: string | null }): Promise<Response>;
+  handleLedgerGet(req: Request, id: number, opts: { isAdmin: boolean; agent: string | null }): Promise<Response>;
+  handleLedgerEvents(req: Request, id: number, opts: { isAdmin: boolean; agent: string | null }): Promise<Response>;
+  handleLedgerSupersede(req: Request, id: number, opts: { isAdmin: boolean; agent: string | null }): Promise<Response>;
+  handleLedgerTombstone(req: Request, id: number, opts: { isAdmin: boolean; agent: string | null }): Promise<Response>;
+  handleLedgerSeed(req: Request): Promise<Response>;
+  handleLedgerContradiction(req: Request, id: number, opts: { isAdmin: boolean; agent: string | null }): Promise<Response>;
+  handleLedgerResolver(req: Request, id: number, opts: { isAdmin: boolean; agent: string | null }): Promise<Response>;
+  handleLedgerResolveDissent(req: Request, id: number, opts: { isAdmin: boolean; agent: string | null }): Promise<Response>;
+  handleKbTaskRescue(req: Request, id: number, opts: { isAdmin: boolean; agent: string | null }): Promise<Response>;
+  handleLedgerRecheckAssignment(req: Request, id: number): Promise<Response>;
+  handleLedgerDemote(req: Request, id: number): Promise<Response>;
+  handleKbCommentSoftDelete(req: Request, taskId: number, commentId: number): Promise<Response>;
   kbTaskSearchWhere(opts: TaskSearchOpts): { where: string; params: (string | number)[]; order: string };
   kbDefaultOrder(tableAlias?: string): string;
+  kbEncodeCursor(key: { d: string | number | null; p: string; c: string | number; i: number }): string;
+  kbDecodeCursor(raw: string): { d: string | number | null; p: string; c: string | number; i: number } | null;
+  kbKeysetTuple(alias: string): string;
+  kbKeysetParams(key: { d: string | number | null; p: string; c: string | number; i: number }): (string | number)[];
+  kbSweepVisibility(): Record<string, unknown>;
+  kbFanoutIds(allIds: number[]): { count: number; ids: number[]; truncated: boolean };
+  kbFanoutPairs(allPairs: Array<{ blocker_id: number; blocked_id: number }>): { count: number; pairs: Array<{ blocker_id: number; blocked_id: number }>; truncated: boolean };
   kbStartOfTodayJakarta(nowSec?: number): number;
   kbAgentLane(agent: string): TaskLane;
   kbLaneOwner(lane: TaskLane): string | null;
@@ -278,6 +395,7 @@ export interface IBusDO {
   ): AutoClaimResult;
   kbTodosFor(taskId: number): TodoRecord[];
   kbTaskWithTodos(row: TaskRecord): TaskWithTodos;
+  kbTasksWithTodos(rows: TaskRecord[]): TaskWithTodos[];
   kbNow(): number;
   kbBasicUser(req: Request): string;
 
@@ -305,6 +423,12 @@ export interface IBusDO {
   readableChannels(agent: string): Set<string>;
   validateChannel(agent: string, channel: string | null | undefined): string | null;
   rlCheck(agent: string): boolean;
+  rlCheckRead(agent: string): boolean;
+  rlCheckWrite(agent: string): boolean;
+  rlRetryAfterSeconds(agent: string): number;
+  rlReadRetryAfterSeconds(agent: string): number;
+  rlLimitedResponse(agent: string, hint?: string, bucket?: string): Response;
+  rlReadLimitedResponse(agent: string, hint?: string): Response;
   churnCheck(agent: string): boolean;
   ensureChannelRow(channel: string, sender: string): string;
   canSendToChannel(agent: string, channel: string): boolean;
@@ -350,6 +474,7 @@ export interface IBusDO {
   handleApiChannelMemberRemove(req: Request, channel: string, agent: string): Promise<Response>;
 
   handleAdminApiStats(req: Request): Promise<Response>;
+  handleAdminApiAuditPurge(req: Request): Promise<Response>;
   handleAdminApiPassword(req: Request): Promise<Response>;
 
   handleKbAdminProjectsList(req: Request): Promise<Response>;
@@ -381,6 +506,8 @@ export interface IBusDO {
   handleKbAgentTodoCreate(req: Request, taskId: number): Promise<Response>;
   handleKbCommentList(req: Request, url: URL, taskId: number, opts: { isAdmin: boolean; agent: string | null }): Promise<Response>;
   handleKbCommentAdd(req: Request, taskId: number, opts: { isAdmin: boolean; agent: string | null }): Promise<Response>;
+  handleKbCommentRestore(req: Request, taskId: number, commentId: number, opts: { isAdmin: boolean; agent: string | null }): Promise<Response>;
+  handleKbAgentSweepHealth(req: Request): Promise<Response>;
   handleKbAgentLabelAdd(req: Request, taskId: number): Promise<Response>;
   handleKbAgentLabelRemove(req: Request, taskId: number, label: string): Promise<Response>;
   handleKbAgentTodoUpdate(req: Request, id: number): Promise<Response>;

@@ -71,6 +71,24 @@ fi
 
 # bus.message (+bus.message.deleted) and kanban.* events, excluding my own
 # loopback; dedup by EVENT id (unique across types).
+# REVAMP v12 NOTE (2026-11-02, corrected fix round 7 — the old note was
+# wrong in both directions, see SPEC §17.4): dependency_events and
+# ledger_events are separate tables, not the poll `events` table, so
+# ledger writes and link/unlink-only changes do NOT wake this script —
+# clients needing those must poll the dependency/unblocked and ledger
+# list endpoints directly. But STATUS-CHANGING dependency moves DO wake
+# it, because the dependency handlers emit poll events for them: row-1
+# link emits kanban.task.blocked, re-block emits kanban.task.blocked,
+# rule 4/4a unblock emits kanban.task.unblocked, and the skipped-unblock
+# / invisible-stuck signals emit kanban.task.dependency_stuck — and this
+# script's kanban.* filter already matches all of them. The old note's
+# "dependency changes do NOT wake this script" and "UNVERIFIED" claims
+# are therefore corrected: status-changing dependency moves wake it;
+# ledger writes and link/unlink-only changes do not. Poll endpoint,
+# auth, cursor, resync, and breaker below were all re-verified against
+# the current poll handler: GET /poll?since_ts=&since_id= with Bearer token,
+# composite ts:id cursor, resync_required on 30-day retention cutoff, 30s
+# poll interval (hook config), 600s grace / 3 windows.
 touch "$STATE_DIR/seen_event_ids"
 seen_json="$(jq -R -s '[split("\n")[] | select(length > 0) | tonumber? // empty]' "$STATE_DIR/seen_event_ids" 2>/dev/null)"
 if ! echo "$seen_json" | jq -e . >/dev/null 2>&1; then seen_json='[]'; fi

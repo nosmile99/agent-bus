@@ -17,7 +17,7 @@ export async function handleSend(this: IBusDO, req: Request): Promise<Response> 
     return this.json(400, { error: "invalid JSON" });
   }
   // Body is consumed before the rate-limit check for the same reason.
-  if (!this.rlCheck(agent)) return this.json(429, { error: "rate limited" });
+  if (!this.rlCheck(agent)) return this.rlLimitedResponse(agent);
   if (!data || typeof data !== "object") return this.json(400, { error: "invalid JSON" });
   const payload = data as Record<string, unknown>;
   const channel = typeof payload.channel === "string" ? payload.channel : "";

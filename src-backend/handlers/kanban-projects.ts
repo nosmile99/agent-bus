@@ -117,9 +117,31 @@ export async function handleKbAdminProjectUpdate(this: IBusDO, req: Request, id:
   if (updates.length === 0 && !subChanged) {
     return this.json(400, { error: "nothing to update" });
   }
+  // m-5 fix: the unarchive UPDATE and the re-evaluation it triggers
+  // run in a single transaction (previously two: the UPDATE outside,
+  // the re-evaluation inside its own transactionSync).
+  const isUnarchive = exists.archived && payload && (payload.archived === 0 || payload.archived === false);
+  let unarchiveFanout: {
+    unblocked: { processed: number; capped: boolean; pending_sweep: boolean };
+    reblocked: { processed: number; capped: boolean; pending_sweep: boolean };
+    capped: boolean;
+    pending_sweep: boolean;
+    processed: number;
+  } | null = null;
   if (updates.length > 0) {
     vals.push(id);
-    this.sql.exec(`UPDATE projects SET ${updates.join(", ")} WHERE id = ?`, ...vals);
+    if (isUnarchive) {
+      this.state.storage.transactionSync(() => {
+        this.sql.exec(`UPDATE projects SET ${updates.join(", ")} WHERE id = ?`, ...vals);
+        unarchiveFanout = this.depReevaluateProject(id, this.kbNow());
+      });
+    } else {
+      this.sql.exec(`UPDATE projects SET ${updates.join(", ")} WHERE id = ?`, ...vals);
+    }
+  } else if (isUnarchive) {
+    this.state.storage.transactionSync(() => {
+      unarchiveFanout = this.depReevaluateProject(id, this.kbNow());
+    });
   }
   if (changed.length > 0) {
     // One event per changed field; change is a singular string (M8).
@@ -150,7 +172,13 @@ export async function handleKbAdminProjectUpdate(this: IBusDO, req: Request, id:
       payload: { id, added, removed, subscribers: newSubs },
     });
   }
-  return this.json(200, { ok: true, id });
+  // Fix round 4, item 4: unarchive fan-out stats in the response
+  // when the re-evaluation ran.
+  return this.json(200, {
+    ok: true,
+    id,
+    ...(unarchiveFanout ? { dependency_fanout: unarchiveFanout } : {}),
+  });
 }
 
 // DELETE /admin/api/kanban/projects/:id — cascade deletes tasks + todos via FK.
@@ -166,14 +194,35 @@ export async function handleKbAdminProjectDelete(this: IBusDO, req: Request, id:
   // (no subscribers) reach all registered agents.
   const subs = this.kbProjectSubscribers(id);
   const recipients = subs.length ? subs : this.allAgents().map((a) => a.agent);
-  this.sql.exec("DELETE FROM projects WHERE id = ?", id);
+  // Amendment batch item 24: full fan-out impact, snapshotted
+  // BEFORE the cascade delete (same cap/truncation contract
+  // as task delete). The cascade removes tasks, their links,
+  // todos, labels, comments, and the subscriber rows.
+  const projectFanout = {
+    tasks: this.kbFanoutIds((this.sql.exec(`SELECT id FROM tasks WHERE project_id = ?`, id).toArray() as Array<{ id: number }>).map((r) => r.id)),
+    links: this.kbFanoutPairs(this.sql.exec(
+      `SELECT blocker_id, blocked_id FROM task_dependencies d WHERE EXISTS (SELECT 1 FROM tasks t WHERE t.project_id = ? AND (t.id = d.blocker_id OR t.id = d.blocked_id))`,
+      id
+    ).toArray() as Array<{ blocker_id: number; blocked_id: number }>),
+    todos: { count: (this.sql.exec(`SELECT COUNT(*) AS c FROM todos WHERE task_id IN (SELECT id FROM tasks WHERE project_id = ?)`, id).one() as { c: number }).c },
+    labels: { count: (this.sql.exec(`SELECT COUNT(*) AS c FROM task_labels WHERE task_id IN (SELECT id FROM tasks WHERE project_id = ?)`, id).one() as { c: number }).c },
+    comments: { count: (this.sql.exec(`SELECT COUNT(*) AS c FROM task_comments WHERE task_id IN (SELECT id FROM tasks WHERE project_id = ?)`, id).one() as { c: number }).c },
+    subscribers: subs,
+  };
+  // Revamp v12 §4.1 rule 7: dependency links cascade with one unlink
+  // event per removed link, in the same transaction as the delete.
+  // Fix round 5, M7: the cascade summary is surfaced, not dropped.
+  let cascadeSummary: { links_removed: number; tasks_deleted: number } | null = null;
+  this.state.storage.transactionSync(() => {
+    cascadeSummary = this.depCascadeOnProjectDelete(id, this.kbNow());
+  });
   this.emitEvent("kanban.project.deleted", {
     actor: "admin",
     project_id: id,
     recipients: recipients.length ? recipients : null,
     payload: { id },
   });
-  return this.json(200, { ok: true, id });
+  return this.json(200, { ok: true, id, fanout: projectFanout, ...(cascadeSummary ? { dependency_cascade: cascadeSummary } : {}) });
 }
 
 export async function handleKbAgentProjectsList(this: IBusDO, req: Request): Promise<Response> {

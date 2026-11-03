@@ -167,7 +167,8 @@ export async function handleKbAgentTodoCreate(this: IBusDO, req: Request, taskId
   }
 
   const wip_warning = autoClaimed ? this.kbWipWarning(agent) : undefined;
-  return this.json(200, { ok: true, id: nid, ...(wip_warning ? { wip_warning } : {}) });
+  // Fix round 3, M10: report whether this call auto-claimed.
+  return this.json(200, { ok: true, id: nid, auto_claimed: autoClaimed, ...(wip_warning ? { wip_warning } : {}) });
 }
 
 // PUT /api/kanban/todos/:id — {text?, done?}. Parent task assignee or transactional auto-claim (§2A.2, §2H). Auth: Bearer.
@@ -247,5 +248,6 @@ export async function handleKbAgentTodoUpdate(this: IBusDO, req: Request, id: nu
   }
 
   const wip_warning = autoClaimed ? this.kbWipWarning(agent) : undefined;
-  return this.json(200, { ok: true, id, ...(wip_warning ? { wip_warning } : {}) });
+  // Fix round 3, M10: report whether this call auto-claimed.
+  return this.json(200, { ok: true, id, auto_claimed: autoClaimed, ...(wip_warning ? { wip_warning } : {}) });
 }

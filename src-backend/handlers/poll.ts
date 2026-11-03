@@ -1,5 +1,6 @@
 // Unified poll (rev 3), legacy poll, and WebSocket handlers
 import { authedAgent } from "./agents.js";
+import { parseBoolParam } from "../utils.js";
 import type { IBusDO, EventRecord, MessageRecord } from '../types.js';
 
 interface WebSocketAttachmentData {
@@ -11,7 +12,15 @@ interface WebSocketAttachmentData {
 
 export async function handlePoll(this: IBusDO, req: Request, url: URL): Promise<Response> {
   const sinceTsRaw = url.searchParams.get("since_ts");
-  const adminMode = url.searchParams.get("admin") === "1";
+  // Fix round 8, (3): admin joins the unified boolean contract
+  // ("1"/"true" true, "0"/"false" false, else 400) instead of
+  // reading "1" only — previously ?admin=true silently ran the
+  // agent path while ?admin=1 ran the admin path.
+  const adminParsed = parseBoolParam(url.searchParams.get("admin"));
+  if (!adminParsed.ok) {
+    return this.json(400, { error: "invalid admin", field: "admin", allowed: ["1", "true", "0", "false"] });
+  }
+  const adminMode = adminParsed.value;
   if (adminMode) {
     if (!(await this.checkBasicAuth(req))) return this.unauthorizedBasic(req);
     return this.handlePollNew(url, null, true);

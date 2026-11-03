@@ -119,10 +119,26 @@ export function kbSetSubscribers(this: IBusDO, projectId: number, subscribers: u
 }
 
 // Task detail payload (kanban rev 4/5): labels, comment/activity counts, todos.
-export function kbTaskDetail(this: IBusDO, row: TaskRecord): TaskDetailResponse {
+// Revamp v12 §6: extended with dependencies (both directions) and
+// ledger_refs (first 20 active task-ref rows, lane-filtered like ledger
+// list reads; admin sees all). comment_count excludes soft-deleted
+// comments; activity_count keeps counting all rows.
+// Amendment batch item 11: kbTaskDetail now also serves ledger_refs
+// paging itself (ledgerRefsAfterId) instead of only pointing at the
+// ledger list, and detail dependencies/refs carry the full fields
+// callers need (blocked_kind/reason + unfinished per blocker,
+// provenance_type + 200-char body excerpt per ref).
+export function kbTaskDetail(
+  this: IBusDO,
+  row: TaskRecord,
+  opts?: { agent?: string | null; isAdmin?: boolean; ledgerRefsAfterId?: number | null }
+): TaskDetailResponse {
   let labels: string[] = [];
   let comment_count = 0;
   let activity_count = 0;
+  let dependencies: TaskDetailResponse['dependencies'] = { blockers: [], blocked_by: [] };
+  let ledger_refs: TaskDetailResponse['ledger_refs'] = [];
+  let ledger_ref_count = 0;
   try {
     labels = (
       this.sql.exec(`SELECT label FROM task_labels WHERE task_id = ? ORDER BY label`, row.id).toArray() as Array<{
@@ -130,7 +146,10 @@ export function kbTaskDetail(this: IBusDO, row: TaskRecord): TaskDetailResponse 
       }>
     ).map((r) => r.label);
     const commentCountRow = this.sql
-      .exec(`SELECT COUNT(*) AS c FROM task_comments WHERE task_id = ? AND author != 'system'`, row.id)
+      .exec(
+        `SELECT COUNT(*) AS c FROM task_comments WHERE task_id = ? AND author != 'system' AND (deleted IS NULL OR deleted = 0)`,
+        row.id
+      )
       .one() as { c: number };
     comment_count = commentCountRow.c;
     const actCountRow = this.sql
@@ -138,13 +157,188 @@ export function kbTaskDetail(this: IBusDO, row: TaskRecord): TaskDetailResponse 
       .one() as { c: number };
     activity_count = actCountRow.c;
   } catch {}
-  return { ...this.kbTaskWithTodos(row), labels, comment_count, activity_count };
+  try {
+    const blockerRows = this.sql
+      .exec(
+        `SELECT t.id, t.title, t.status, t.blocked_kind, t.blocked_reason FROM task_dependencies d JOIN tasks t ON t.id = d.blocker_id WHERE d.blocked_id = ? ORDER BY t.id ASC`,
+        row.id
+      )
+      .toArray() as Array<{ id: number; title: string; status: string; blocked_kind: string | null; blocked_reason: string | null }>;
+    const blockedByRows = this.sql
+      .exec(
+        `SELECT t.id, t.title, t.status FROM task_dependencies d JOIN tasks t ON t.id = d.blocked_id WHERE d.blocker_id = ? ORDER BY t.id ASC`,
+        row.id
+      )
+      .toArray() as Array<{ id: number; title: string; status: string }>;
+    dependencies = {
+      blockers: blockerRows.map((r) => ({ ...r, status: r.status as TaskDetailResponse['dependencies']['blockers'][number]['status'], unfinished: r.status !== 'done' })),
+      blocked_by: blockedByRows.map((r) => ({ ...r, status: r.status as TaskDetailResponse['dependencies']['blocked_by'][number]['status'], unfinished: r.status !== 'done' })),
+    };
+  } catch {}
+  // Fix round 2 (MAJOR): ledger_ref_count is the TOTAL filtered
+  // active count per locked plan §6 and SPEC, NOT the returned
+  // count. The COUNT is restored alongside the fetch-21 window
+  // (ledger_refs capped at 20 + has_more); idx_ledger_task_ref
+  // (ref_type, ref_id, status) keeps the count an index scan.
+  let ledger_refs_has_more = false;
+  let ledger_refs_next_after_id: number | null = null;
+  try {
+    const laneFilter = opts?.isAdmin
+      ? `1=1`
+      : opts?.agent
+        ? `(target_lane IS NULL OR target_lane = ?)`
+        : `target_lane IS NULL`;
+    const laneParams: (string | number)[] = opts?.isAdmin || !opts?.agent ? [] : [opts.agent];
+    // Amendment batch item 11: refs page by id keyset when the
+    // caller passes ledgerRefsAfterId; provenance_type + a
+    // 200-char body excerpt ride along (same truncation as the
+    // ledger list's body_truncated).
+    const afterClause = opts?.ledgerRefsAfterId ? `AND id > ?` : ``;
+    const afterParams: number[] = opts?.ledgerRefsAfterId ? [opts.ledgerRefsAfterId] : [];
+    const fetchedRaw = this.sql
+      .exec(
+        `SELECT id, kind, title, scope, target_lane, provenance_type, body FROM ledger
+         WHERE status = 'active' AND ref_type = 'task' AND ref_id = ? AND ${laneFilter} ${afterClause}
+         ORDER BY id ASC LIMIT 21`,
+        String(row.id),
+        ...laneParams,
+        ...afterParams
+      )
+      .toArray() as Array<{ id: number; kind: string; title: string; scope: string; target_lane: string | null; provenance_type: string | null; body: string }>;
+    const fetched: TaskDetailResponse['ledger_refs'] = fetchedRaw.map((r) => ({
+      id: r.id, kind: r.kind, title: r.title, scope: r.scope, target_lane: r.target_lane,
+      provenance_type: r.provenance_type, body_excerpt: (r.body || '').slice(0, 200),
+    }));
+    ledger_refs_has_more = fetched.length > 20;
+    ledger_refs = fetched.slice(0, 20);
+    // Fix round 7, (f): continuation pointer for refs 21+ (see
+    // types.ts): the last returned ref's id, for the ledger-list
+    // workaround, which the payload now points at explicitly.
+    ledger_refs_next_after_id = ledger_refs_has_more && ledger_refs.length > 0 ? ledger_refs[ledger_refs.length - 1]!.id : null;
+    const countRow = this.sql
+      .exec(
+        `SELECT COUNT(*) AS c FROM ledger
+         WHERE status = 'active' AND ref_type = 'task' AND ref_id = ? AND ${laneFilter}`,
+        String(row.id),
+        ...laneParams
+      )
+      .one() as { c: number };
+    ledger_ref_count = countRow.c;
+  } catch {}
+  return {
+    ...this.kbTaskWithTodos(row),
+    labels,
+    comment_count,
+    activity_count,
+    // Fix round 4, item 13: the two counts differ by design, and
+    // the payload now says so instead of leaving callers to
+    // guess why comment_count < activity_count on a task with
+    // system logs or soft-deleted comments.
+    count_note:
+      'comment_count counts non-system, non-deleted comments only; activity_count counts every task_comments row, including system logs and soft-deleted comments',
+    dependencies,
+    ledger_refs,
+    ledger_ref_count,
+    ledger_refs_has_more,
+    ledger_refs_next_after_id,
+  };
 }
 
 // Locked default sort (§2E.3): due_date ASC NULLS LAST, priority DESC (urgent > normal > low), created_at ASC, id ASC.
 export function kbDefaultOrder(tableAlias = "tasks"): string {
   const t = tableAlias;
   return `CASE WHEN ${t}.due_date IS NULL THEN 1 ELSE 0 END ASC, ${t}.due_date ASC, CASE ${t}.priority WHEN 'urgent' THEN 3 WHEN 'normal' THEN 2 WHEN 'low' THEN 1 ELSE 0 END DESC, ${t}.created_at ASC, ${t}.id ASC`;
+}
+
+// Amendment batch items 23/25: opaque keyset cursor for the
+// default sort, and the pending-sweep visibility object.
+// Cursor payload: { d: due_date|null, p: priority, c: created_at,
+// i: id }. The SQL tuple uses COALESCE(due_date,'9999-12-31') so
+// NULL due dates sort last exactly like the default order, and a
+// numeric priority rank (urgent 0 < normal 1 < low 2) ASC, which
+// matches the default order's priority DESC. Row-value comparison
+// Re-roast 9, bug M1: d is the STORED due_date - an INTEGER epoch,
+// or null - never a string (the old string-only decode rejected the
+// server's own cursors whenever the page-boundary task had a due
+// date). Decode accepts number or string for robustness, and
+// kbKeysetParams passes d through un-coerced so SQLite's
+// INTEGER < TEXT ordering keeps due-dated rows before null-due
+// rows, exactly like kbDefaultOrder's NULLS-LAST.
+// (a,b,c,d) > (?,?,?,?) is supported by SQLite. Offset is kept
+// only as a deprecated fallback (see callers); the cursor is the
+// primary mechanism.
+export interface KbSortKey { d: string | number | null; p: string; c: string | number; i: number }
+export function kbEncodeCursor(key: KbSortKey): string {
+  const b64 = btoa(unescape(encodeURIComponent(JSON.stringify(key))));
+  return b64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+export function kbDecodeCursor(raw: string): KbSortKey | null {
+  try {
+    const b64 = raw.replace(/-/g, '+').replace(/_/g, '/');
+    const json = decodeURIComponent(escape(atob(b64)));
+    const v = JSON.parse(json) as KbSortKey;
+    if ((typeof v.c !== 'string' && typeof v.c !== 'number') || typeof v.i !== 'number' || typeof v.p !== 'string') return null;
+    if (v.d !== null && typeof v.d !== 'string' && typeof v.d !== 'number') return null;
+    return v;
+  } catch {
+    return null;
+  }
+}
+export function kbKeysetTuple(alias: string): string {
+  return `(COALESCE(${alias}.due_date, '9999-12-31'), CASE ${alias}.priority WHEN 'urgent' THEN 0 WHEN 'normal' THEN 1 WHEN 'low' THEN 2 ELSE 3 END, ${alias}.created_at, ${alias}.id)`;
+}
+export function kbKeysetParams(key: KbSortKey): (string | number)[] {
+  const rank = key.p === 'urgent' ? 0 : key.p === 'normal' ? 1 : key.p === 'low' ? 2 : 3;
+  return [key.d ?? '9999-12-31', rank, key.c, key.i];
+}
+
+// Amendment batch item 24: delete fan-out detail shape. Id
+// lists are capped (sane cap, not whole-table dumps); counts
+// are exact totals, and truncated flags say whether the list
+// was cut. Callers snapshot BEFORE the cascade delete.
+export const DELETE_FANOUT_ID_CAP = 100;
+export function kbFanoutIds(allIds: number[]): { count: number; ids: number[]; truncated: boolean } {
+  return { count: allIds.length, ids: allIds.slice(0, DELETE_FANOUT_ID_CAP), truncated: allIds.length > DELETE_FANOUT_ID_CAP };
+}
+export function kbFanoutPairs(allPairs: Array<{ blocker_id: number; blocked_id: number }>): { count: number; pairs: Array<{ blocker_id: number; blocked_id: number }>; truncated: boolean } {
+  return { count: allPairs.length, pairs: allPairs.slice(0, DELETE_FANOUT_ID_CAP), truncated: allPairs.length > DELETE_FANOUT_ID_CAP };
+}
+
+// Amendment batch item 25: pending-sweep visibility, shared by
+// admin stats and the agent-visible sweep-health endpoint. The
+// deadline is explicit: the hourly alarm cadence means a sweep
+// converges within ceil(open_projects / 20) hours (rotation
+// bound); in single-pass mode (see index.ts) it is 1 hour.
+// expected_convergence_at is now + that bound; next_sweep_at is
+// alarm_last_completed + 3600s when a completion stamp exists.
+export function kbSweepVisibility(this: IBusDO): Record<string, unknown> {
+  const now = Math.floor(Date.now() / 1000);
+  let meta: Record<string, unknown> = {};
+  try {
+    const rows = this.sql.exec(`SELECT value FROM bus_meta WHERE key = 'sweep_pending'`).toArray() as Array<{ value: string }>;
+    if (rows[0]) meta = JSON.parse(rows[0].value) as Record<string, unknown>;
+  } catch {}
+  let lastCompleted: number | null = null;
+  try {
+    const rows = this.sql.exec(`SELECT value FROM bus_meta WHERE key = 'alarm_last_completed'`).toArray() as Array<{ value: string }>;
+    if (rows[0]) lastCompleted = (JSON.parse(rows[0].value) as { at?: number }).at ?? null;
+  } catch {}
+  const openProjects = (this.sql.exec(`SELECT COUNT(*) AS c FROM projects WHERE archived = 0`).one() as { c: number }).c;
+  const singlePass = meta['single_pass'] === true;
+  const rotationHours = singlePass ? 1 : Math.max(1, Math.ceil(openProjects / 20));
+  return {
+    pending_sweep: meta['pending_sweep'] ?? false,
+    pending_projects: meta['pending_projects'] ?? [],
+    failed_projects: meta['failed_projects'] ?? [],
+    unvisited_projects: meta['unvisited_projects'] ?? 0,
+    window_projects: meta['window_projects'] ?? null,
+    open_projects: openProjects,
+    single_pass: singlePass,
+    rotation_window_hours: rotationHours,
+    expected_convergence_at: new Date((now + rotationHours * 3600) * 1000).toISOString(),
+    next_sweep_at: lastCompleted !== null ? new Date((lastCompleted + 3600) * 1000).toISOString() : null,
+    sweep_pending_at: typeof meta['at'] === 'number' ? new Date((meta['at'] as number) * 1000).toISOString() : null,
+  };
 }
 
 // Start of current day (00:00:00) in Asia/Jakarta (UTC+07:00, fixed offset +25200s) as UTC epoch seconds (§2C.1).
@@ -226,9 +420,33 @@ export function kbAutoClaimOrVerify(
   }
 
   // Already owned by calling agent: verify project is not archived.
+  // Fix round 3 minor: an already-owned touch clears unblocked_at
+  // ONLY on the status path (isStatusEndpoint). The plan's clearing
+  // list is claim, release, and status — a todo/label/note/task-update
+  // touch by the owner must not clear the stamp merely because the
+  // owner wrote. (Fresh auto-claims still clear it in the claim
+  // branches below, and claim/release handlers clear it themselves.)
   if (row.assignee === agent) {
     if (row.project_archived) {
       return { ok: false, code: 403, body: { error: "project archived" } };
+    }
+    if (opts?.isStatusEndpoint) {
+      // Fix round 4, item 7: the status-path touch clears
+      // unblocked_at only on a real transition (or a move out of
+      // blocked, which clears by rule). A same-status status PUT
+      // is not a transition, so it keeps the stamp — the old code
+      // cleared it on every already-owned status write, wiping a
+      // rule-4-unblocked todo task from the unblocked list on a
+      // no-op.
+      const requested = opts?.requestedStatus;
+      const clears = requested === undefined || requested !== row.status || row.status === 'blocked';
+      if (clears) {
+        this.sql.exec(`UPDATE tasks SET unblocked_at = NULL WHERE id = ?`, taskId);
+      }
+      const refreshed = (
+        this.sql.exec(`SELECT * FROM tasks WHERE id = ?`, taskId).toArray() as unknown as TaskRecord[]
+      )[0]!;
+      return { ok: true, autoClaimed: false, task: refreshed };
     }
     return { ok: true, autoClaimed: false, task: row };
   }
@@ -250,7 +468,15 @@ export function kbAutoClaimOrVerify(
   }
 
   // Special rule for PUT .../status: cannot auto-claim an unassigned task into 'todo' (§2A.2).
-  if (row.assignee === null && opts?.isStatusEndpoint && opts.requestedStatus === "todo") {
+  // Fix round C5: a blocked unassigned task is exempt — claiming it
+  // preserves 'blocked', and the requested 'todo' is then the unblock
+  // move, not a claim into todo.
+  if (
+    row.assignee === null &&
+    row.status !== 'blocked' &&
+    opts?.isStatusEndpoint &&
+    opts.requestedStatus === "todo"
+  ) {
     return { ok: false, code: 400, body: { error: "cannot_auto_claim_to_todo" } };
   }
 
@@ -260,11 +486,64 @@ export function kbAutoClaimOrVerify(
     opts?.requestedLane !== undefined &&
     opts.requestedLane !== agentLane;
 
+  // Fix round C5: auto-claim of a blocked unassigned task preserves
+  // the blocked state exactly (status, kind, reason, from_status).
+  // Callers then decide the next move (status endpoint moves out of
+  // blocked with the unblocked event; label/update callers keep the
+  // task blocked). status_changed_at is untouched: status did not move.
+  if (row.assignee === null && row.status === 'blocked' && !tryingOtherLane) {
+    const now = this.kbNow();
+    const res = this.sql.exec(
+      `UPDATE tasks
+       SET assignee = ?, claimed_at = ?, updated_at = ?, last_activity_at = ?, unblocked_at = NULL,
+           lane = CASE WHEN lane = 'unassigned' THEN ? ELSE lane END
+       WHERE id = ?
+         AND assignee IS NULL
+         AND (admin_assigned IS NULL OR admin_assigned = ?)
+         AND status = 'blocked'
+         AND NOT EXISTS (SELECT 1 FROM projects p WHERE p.id = tasks.project_id AND p.archived = 1)
+         AND ${this.kbSubscriberPred("tasks.project_id")}
+         AND (lane = 'unassigned' OR lane = ?)`,
+      agent,
+      now,
+      now,
+      now,
+      agentLane,
+      taskId,
+      agent,
+      agent,
+      agentLane
+    ) as { rowsWritten?: number };
+    if ((res.rowsWritten ?? 0) > 0) {
+      const updated = (
+        this.sql.exec(`SELECT * FROM tasks WHERE id = ?`, taskId).toArray() as unknown as TaskRecord[]
+      )[0]!;
+      this.kbSystemLog(taskId, `${agent} auto-claimed the task`);
+      this.emitEvent("kanban.task.claimed", {
+        actor: agent,
+        project_id: updated.project_id,
+        payload: {
+          id: taskId,
+          task_id: taskId,
+          claimant: agent,
+          assignee: agent,
+          auto: true,
+          lane: updated.lane,
+          status: 'blocked',
+          blocked_kind: updated.blocked_kind,
+          blocked_reason: updated.blocked_reason,
+          blocked_from_status: updated.blocked_from_status,
+        },
+      });
+      return { ok: true, autoClaimed: true, task: updated };
+    }
+  }
+
   if (row.assignee === null && !tryingOtherLane) {
     const now = this.kbNow();
     const res = this.sql.exec(
       `UPDATE tasks
-       SET assignee = ?, status = 'doing', claimed_at = ?, status_changed_at = ?, updated_at = ?, last_activity_at = ?,
+       SET assignee = ?, status = 'doing', claimed_at = ?, status_changed_at = ?, updated_at = ?, last_activity_at = ?, unblocked_at = NULL,
            lane = CASE WHEN lane = 'unassigned' THEN ? ELSE lane END
        WHERE id = ?
          AND assignee IS NULL
@@ -285,7 +564,12 @@ export function kbAutoClaimOrVerify(
       agentLane
     ) as { rowsWritten?: number };
 
-    if ((res.rowsWritten ?? 0) === 1) {
+    // NOTE: rowsWritten counts index writes too (a 1-row tasks UPDATE
+    // reports 3 in workerd: the row plus its stale/blocked indexes), so
+    // the match test is > 0, not === 1. The === 1 form made every
+    // unassigned-task auto-claim fail with 409 wrong_lane even though
+    // the UPDATE had matched. Same fix in handleKbAgentTaskClaim.
+    if ((res.rowsWritten ?? 0) > 0) {
       const updated = (
         this.sql.exec(`SELECT * FROM tasks WHERE id = ?`, taskId).toArray() as unknown as TaskRecord[]
       )[0]!;
@@ -313,7 +597,7 @@ export function kbAutoClaimOrVerify(
     reason = "already_claimed";
   } else if (row.admin_assigned !== null && row.admin_assigned !== agent) {
     reason = "admin_locked";
-  } else if (row.status !== "todo") {
+  } else if (row.status !== "todo" && row.status !== "blocked") {
     reason = "invalid_status";
   } else {
     reason = "wrong_lane";

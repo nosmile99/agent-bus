@@ -29,6 +29,21 @@ export async function sha256Hex(input: string): Promise<string> {
   return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
+// Fix round 7, (a): unified boolean query spelling. Every boolean
+// query flag accepts BOTH "1" and "true" for true, and "0"/"false"
+// for false; anything else is invalid (400) instead of silently
+// filtering the wrong set. Absent means false. Callers that
+// previously compared only === "1" (search/summary) or only
+// === "true" (ledger/comments) silently misread the other spelling.
+export function parseBoolParam(
+  raw: string | null
+): { ok: true; value: boolean } | { ok: false } {
+  if (raw === null) return { ok: true, value: false };
+  if (raw === '1' || raw === 'true') return { ok: true, value: true };
+  if (raw === '0' || raw === 'false') return { ok: true, value: false };
+  return { ok: false };
+}
+
 export function dmChannel(a: string, b: string): string {
   return "dm:" + [a, b].slice().sort().join(":");
 }

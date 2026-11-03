@@ -115,14 +115,106 @@ export async function handleAdminApiStats(this: IBusDO, req: Request): Promise<R
   ).map((r) => ({ channel: r.channel, count: r.c }));
   const total = (this.sql.exec("SELECT COUNT(*) AS c FROM messages").one() as { c: number }).c;
   const agentCount = (this.sql.exec("SELECT COUNT(*) AS c FROM agents").one() as { c: number }).c;
+  // Fix round 4, item 5: sweep health from bus_meta (persisted,
+  // not DO-log-only). Missing keys mean the meta table predates
+  // this round or migrations have not run yet — reported as
+  // null, never invented.
+  const sweepHealth: Record<string, unknown> = {};
+  try {
+    for (const row of this.sql
+      .exec(`SELECT key, value FROM bus_meta WHERE key IN ('alarm_boot', 'alarm_last_run', 'alarm_last_completed', 'alarm_last_error', 'alarm_reschedule_error', 'alarm_rearm', 'alarm_rearm_failures', 'sweep_pending')`)
+      .toArray() as Array<{ key: string; value: string }>) {
+      try {
+        sweepHealth[row.key] = JSON.parse(row.value);
+      } catch {
+        sweepHealth[row.key] = row.value;
+      }
+    }
+  } catch {}
+  // Amendment batch item 25: the same sweep-visibility object
+  // the agent endpoint serves, so admin stats and the caller
+  // surface agree (counts, convergence bound, next sweep).
+  // Amendment batch item 18: audit-table sizes for
+  // observability (row counts only, never row content).
+  const auditSizes: Record<string, number> = {};
+  for (const tbl of ['dependency_events', 'ledger_events']) {
+    try {
+      auditSizes[tbl] = (this.sql.exec(`SELECT COUNT(*) AS c FROM ${tbl}`).one() as { c: number }).c;
+    } catch {
+      auditSizes[tbl] = -1;
+    }
+  }
   return this.json(200, {
     messagesToday: todayCount,
     totalMessages: total,
     perChannel,
     registeredAgents: agentCount,
+    sweepHealth,
+    sweepVisibility: this.kbSweepVisibility(),
+    auditSizes,
     doStatus: "ok",
     ts: new Date().toISOString(),
   });
+}
+
+// POST /admin/api/audit/purge — amendment batch item 18,
+// enforcement hook for the retention rules. Minimum
+// retention: AUDIT_MIN_RETENTION_DAYS (90) for both
+// dependency_events and ledger_events, counted from the
+// event's created_at (epoch seconds). Rows younger than the minimum
+// are NEVER deleted by this endpoint: a request with a
+// cutoff inside the retention window is 400, and the purge
+// itself only deletes rows with ts <= cutoff AND ts <=
+// now - 90 days. The cutoff is explicit in the request
+// (before_ts, epoch seconds, required) so no purge is ever
+// implicit or alarm-driven: the alarm path never deletes
+// audit rows. The deleted counts are reported per table,
+// and the purge is recorded in bus_meta (audit_purge_log,
+// capped at 20 entries) — the log itself is metadata, not
+// an audit row, so it survives the purge.
+export const AUDIT_MIN_RETENTION_DAYS = 90;
+export async function handleAdminApiAuditPurge(this: IBusDO, req: Request): Promise<Response> {
+  if (!(await this.checkBasicAuth(req))) return this.unauthorizedBasic(req);
+  let data: unknown;
+  try {
+    data = await req.json();
+  } catch {
+    return this.json(400, { error: 'invalid json' });
+  }
+  const payload = data as Record<string, unknown> | null;
+  const beforeTs = payload?.before_ts;
+  if (typeof beforeTs !== 'number' || !Number.isFinite(beforeTs) || beforeTs <= 0) {
+    return this.json(400, { error: 'before_ts required (epoch seconds)', field: 'before_ts' });
+  }
+  const now = this.kbNow();
+  const minCutoff = now - AUDIT_MIN_RETENTION_DAYS * 86400;
+  if (beforeTs > minCutoff) {
+    return this.json(400, {
+      error: 'before_ts inside the minimum retention window',
+      field: 'before_ts',
+      min_retention_days: AUDIT_MIN_RETENTION_DAYS,
+      earliest_allowed_cutoff: minCutoff,
+    });
+  }
+  const deleted: Record<string, number> = {};
+  this.state.storage.transactionSync(() => {
+    for (const tbl of ['dependency_events', 'ledger_events']) {
+      this.sql.exec(`DELETE FROM ${tbl} WHERE created_at <= ?`, beforeTs);
+      deleted[tbl] = (this.sql.exec('SELECT changes() AS c').one() as { c: number }).c;
+    }
+    let log: Array<Record<string, unknown>> = [];
+    try {
+      const rows = this.sql.exec(`SELECT value FROM bus_meta WHERE key = 'audit_purge_log'`).toArray() as Array<{ value: string }>;
+      if (rows[0]) log = JSON.parse(rows[0].value) as Array<Record<string, unknown>>;
+    } catch {}
+    log.push({ at: now, by: this.kbBasicUser(req) || 'admin', before_ts: beforeTs, deleted });
+    log = log.slice(-20);
+    this.sql.exec(
+      `INSERT INTO bus_meta (key, value) VALUES ('audit_purge_log', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
+      JSON.stringify(log)
+    );
+  });
+  return this.json(200, { ok: true, before_ts: beforeTs, min_retention_days: AUDIT_MIN_RETENTION_DAYS, deleted });
 }
 
 export async function handleAdminApiPassword(this: IBusDO, req: Request): Promise<Response> {

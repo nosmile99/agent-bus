@@ -60,7 +60,7 @@ export async function runKanbanRev5Tests(
     }>;
     assertEqual(
       migs.map((m) => m.version),
-      [2, 3, 4, 5, 6],
+      [2, 3, 4, 5, 6, 7, 8],
       'runMigrations versions'
     );
 
