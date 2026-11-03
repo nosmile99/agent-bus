@@ -4,13 +4,11 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.focusable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
@@ -20,15 +18,15 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.input.key.*
 import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -36,8 +34,12 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import com.agentbus.admin.ui.theme.DarkLuxePalette
+import com.agentbus.admin.ui.theme.ObsidianShapes
+import com.agentbus.admin.ui.theme.ObsidianTheme
 import com.agentbus.admin.ui.theme.SdTheme
 import java.time.Instant
 import java.time.ZoneId
@@ -51,9 +53,9 @@ enum class SdButtonVariant {
     COBALT
 }
 
-private val TagShape = RoundedCornerShape(2.dp)
-private val ControlShape = RoundedCornerShape(4.dp)
-private val PanelShape = RoundedCornerShape(6.dp)
+private val TagShape = ObsidianShapes.radius8
+private val ControlShape = ObsidianShapes.radius10
+private val PanelShape = ObsidianShapes.radius14
 
 @Composable
 fun SdText(
@@ -89,49 +91,53 @@ fun SdButton(
     enabled: Boolean = true,
     compact: Boolean = false
 ) {
-    val colors = SdTheme.colors
+    val colors = ObsidianTheme.colors
+    val typo = ObsidianTheme.typography
     val interactionSource = remember { MutableInteractionSource() }
-    val isFocused by interactionSource.collectIsFocusedAsState()
     val isPressed by interactionSource.collectIsPressedAsState()
 
-    val bgColor = when {
-        !enabled -> colors.bgSubtle
-        variant == SdButtonVariant.PRIMARY -> colors.signalVermilion
-        variant == SdButtonVariant.COBALT -> colors.cobaltInk
-        variant == SdButtonVariant.DANGER -> colors.dangerCrimson
-        variant == SdButtonVariant.SECONDARY -> colors.bgSurface
-        else -> Color.Transparent
+    val scale = if (isPressed) 0.97f else 1f
+    val shape = if (compact) ObsidianShapes.radius10 else ObsidianShapes.radius12
+
+    val bgBrush: Brush = when {
+        !enabled -> SolidColor(colors.fill)
+        variant == SdButtonVariant.PRIMARY -> colors.goldGradient
+        variant == SdButtonVariant.COBALT -> SolidColor(colors.statusDoing)
+        variant == SdButtonVariant.DANGER -> SolidColor(colors.fill)
+        variant == SdButtonVariant.SECONDARY -> SolidColor(colors.fill)
+        else -> SolidColor(Color.Transparent)
     }
 
     val fgColor = when {
-        !enabled -> colors.inkMuted
-        variant == SdButtonVariant.PRIMARY -> colors.onSignalVermilion
-        variant == SdButtonVariant.COBALT -> colors.onCobaltInk
-        variant == SdButtonVariant.DANGER -> colors.onDangerCrimson
-        variant == SdButtonVariant.SECONDARY -> colors.inkPrimary
-        else -> colors.inkPrimary
+        !enabled -> colors.faint
+        variant == SdButtonVariant.PRIMARY -> colors.onGold
+        variant == SdButtonVariant.COBALT -> colors.onGold
+        variant == SdButtonVariant.DANGER -> colors.danger
+        variant == SdButtonVariant.SECONDARY -> colors.goldPale
+        else -> colors.textSoft
     }
 
     val borderColor = when {
-        isFocused -> colors.cobaltInk
-        !enabled -> colors.borderSubtle
-        variant == SdButtonVariant.PRIMARY -> colors.signalVermilion
-        variant == SdButtonVariant.COBALT -> colors.cobaltInk
-        variant == SdButtonVariant.DANGER -> colors.dangerCrimson
-        else -> colors.borderStrong
+        !enabled -> colors.line
+        variant == SdButtonVariant.PRIMARY -> colors.goldEdge
+        variant == SdButtonVariant.COBALT -> colors.statusDoing
+        variant == SdButtonVariant.DANGER -> colors.dangerLine
+        variant == SdButtonVariant.SECONDARY -> colors.amberLine
+        else -> Color.Transparent
     }
 
-    val borderWidth = if (isFocused) 2.5.dp else if (isPressed) 2.dp else 1.dp
+    val paddingV = if (compact) 6.dp else 9.dp
+    val paddingH = if (compact) 12.dp else 16.dp
 
     Box(
         modifier = modifier
-            .defaultMinSize(
-                minWidth = 48.dp,
-                minHeight = if (compact) 44.dp else 48.dp
+            .scale(scale)
+            .clip(shape)
+            .background(bgBrush)
+            .then(
+                if (borderColor != Color.Transparent) Modifier.border(1.dp, borderColor, shape)
+                else Modifier
             )
-            .clip(ControlShape)
-            .background(bgColor)
-            .border(borderWidth, borderColor, ControlShape)
             .onPreviewKeyEvent { event ->
                 if (enabled && event.type == KeyEventType.KeyDown &&
                     (event.key == Key.Enter || event.key == Key.Spacebar)
@@ -147,13 +153,14 @@ fun SdButton(
                 role = Role.Button,
                 onClick = onClick
             )
-            .padding(horizontal = if (compact) 12.dp else 16.dp, vertical = if (compact) 8.dp else 10.dp),
+            .padding(horizontal = paddingH, vertical = paddingV),
         contentAlignment = Alignment.Center
     ) {
         SdText(
             text = label,
-            style = SdTheme.typo.buttonLabel,
+            style = if (compact) typo.small else typo.label,
             color = fgColor,
+            fontWeight = if (variant == SdButtonVariant.PRIMARY) FontWeight.Bold else FontWeight.SemiBold,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
         )
@@ -167,24 +174,19 @@ fun SdFilterChip(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val colors = SdTheme.colors
-    val interactionSource = remember { MutableInteractionSource() }
-    val isFocused by interactionSource.collectIsFocusedAsState()
+    val colors = ObsidianTheme.colors
+    val typo = ObsidianTheme.typography
+    val shape = ObsidianShapes.radiusFull
 
-    val bg = if (selected) colors.cobaltInk else colors.bgSurface
-    val fg = if (selected) colors.onCobaltInk else colors.inkPrimary
-    val border = when {
-        isFocused -> colors.signalVermilion
-        selected -> colors.cobaltInk
-        else -> colors.borderStrong
-    }
+    val bgBrush = if (selected) colors.goldGradient else SolidColor(colors.fill)
+    val borderCol = if (selected) colors.goldEdge else colors.lineChip
+    val fg = if (selected) colors.onGold else colors.textDim
 
     Box(
         modifier = modifier
-            .defaultMinSize(minWidth = 44.dp, minHeight = 44.dp)
-            .clip(ControlShape)
-            .background(bg)
-            .border(if (isFocused || selected) 2.dp else 1.dp, border, ControlShape)
+            .clip(shape)
+            .background(bgBrush)
+            .border(1.dp, borderCol, shape)
             .onPreviewKeyEvent { event ->
                 if (event.type == KeyEventType.KeyDown &&
                     (event.key == Key.Enter || event.key == Key.Spacebar)
@@ -194,12 +196,10 @@ fun SdFilterChip(
                 } else false
             }
             .clickable(
-                interactionSource = interactionSource,
-                indication = null,
                 role = Role.Tab,
                 onClick = onClick
             )
-            .padding(horizontal = 12.dp, vertical = 8.dp),
+            .padding(horizontal = 12.dp, vertical = 6.dp),
         contentAlignment = Alignment.Center
     ) {
         Row(
@@ -207,14 +207,15 @@ fun SdFilterChip(
             horizontalArrangement = Arrangement.spacedBy(6.dp)
         ) {
             if (selected) {
-                Canvas(modifier = Modifier.size(6.dp)) {
-                    drawRect(color = fg)
+                Canvas(modifier = Modifier.size(5.dp)) {
+                    drawCircle(color = fg)
                 }
             }
             SdText(
                 text = label,
-                style = SdTheme.typo.monoTag,
-                color = fg
+                style = typo.small,
+                color = fg,
+                fontWeight = if (selected) FontWeight.Bold else FontWeight.SemiBold
             )
         }
     }
@@ -224,21 +225,21 @@ fun SdFilterChip(
 fun SdTag(
     text: String,
     modifier: Modifier = Modifier,
-    bgColor: Color = SdTheme.colors.bgSubtle,
-    textColor: Color = SdTheme.colors.inkPrimary,
-    borderColor: Color = SdTheme.colors.borderSubtle
+    bgColor: Color = ObsidianTheme.colors.fill,
+    textColor: Color = ObsidianTheme.colors.text,
+    borderColor: Color = ObsidianTheme.colors.line
 ) {
     Box(
         modifier = modifier
             .clip(TagShape)
             .background(bgColor)
             .border(1.dp, borderColor, TagShape)
-            .padding(horizontal = 6.dp, vertical = 2.dp),
+            .padding(horizontal = 8.dp, vertical = 2.dp),
         contentAlignment = Alignment.Center
     ) {
         SdText(
             text = text,
-            style = SdTheme.typo.monoTag,
+            style = ObsidianTheme.typography.tag,
             color = textColor,
             maxLines = 1
         )
@@ -247,53 +248,53 @@ fun SdTag(
 
 @Composable
 fun SdPriorityTag(priority: String, modifier: Modifier = Modifier) {
-    val colors = SdTheme.colors
-    val (bg, fg, border) = when (priority.lowercase()) {
-        "urgent" -> Triple(colors.dangerCrimson, colors.onDangerCrimson, colors.dangerCrimson)
-        "low" -> Triple(colors.bgSubtle, colors.inkSecondary, colors.borderSubtle)
-        else -> Triple(colors.cobaltInk, colors.onCobaltInk, colors.cobaltInk)
+    val colors = ObsidianTheme.colors
+    val (tone, fg) = when (priority.lowercase()) {
+        "urgent" -> colors.danger to colors.danger
+        "low" -> colors.faint to colors.faint
+        else -> colors.accent to colors.accent
     }
     SdTag(
         text = "PRI:${priority.uppercase()}",
         modifier = modifier,
-        bgColor = bg,
+        bgColor = tone.copy(alpha = 0.14f),
         textColor = fg,
-        borderColor = border
+        borderColor = tone.copy(alpha = 0.35f)
     )
 }
 
 @Composable
 fun SdStatusTag(status: String, modifier: Modifier = Modifier) {
-    val colors = SdTheme.colors
-    val (bg, fg, border) = when (status.lowercase()) {
-        "doing" -> Triple(colors.cobaltInk, colors.onCobaltInk, colors.cobaltInk)
-        "blocked" -> Triple(colors.dangerCrimson, colors.onDangerCrimson, colors.dangerCrimson)
-        "done" -> Triple(colors.forestOk, colors.onForestOk, colors.forestOk)
-        else -> Triple(colors.bgSubtle, colors.inkPrimary, colors.borderStrong)
+    val colors = ObsidianTheme.colors
+    val tone = when (status.lowercase()) {
+        "doing" -> colors.statusDoing
+        "blocked" -> colors.statusBlocked
+        "done" -> colors.statusDone
+        else -> colors.statusBacklog
     }
     SdTag(
         text = status.uppercase(),
         modifier = modifier,
-        bgColor = bg,
-        textColor = fg,
-        borderColor = border
+        bgColor = tone.copy(alpha = 0.14f),
+        textColor = tone,
+        borderColor = tone.copy(alpha = 0.35f)
     )
 }
 
 @Composable
 fun SdLaneTag(lane: String, modifier: Modifier = Modifier) {
-    val colors = SdTheme.colors
-    val (bg, fg, border) = when (lane.lowercase()) {
-        "backend" -> Triple(colors.amberWarn, colors.onAmberWarn, colors.amberWarn)
-        "android" -> Triple(colors.forestOk, colors.onForestOk, colors.forestOk)
-        else -> Triple(colors.bgSubtle, colors.inkSecondary, colors.borderSubtle)
+    val colors = ObsidianTheme.colors
+    val tone = when (lane.lowercase()) {
+        "backend" -> colors.accent
+        "android" -> colors.statusDone
+        else -> colors.muted
     }
     SdTag(
         text = "LANE:${lane.uppercase()}",
         modifier = modifier,
-        bgColor = bg,
-        textColor = fg,
-        borderColor = border
+        bgColor = tone.copy(alpha = 0.14f),
+        textColor = tone,
+        borderColor = tone.copy(alpha = 0.35f)
     )
 }
 
@@ -312,49 +313,50 @@ fun SdTextField(
     keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
     keyboardActions: KeyboardActions = KeyboardActions.Default
 ) {
-    val colors = SdTheme.colors
+    val colors = ObsidianTheme.colors
+    val typo = ObsidianTheme.typography
     val interactionSource = remember { MutableInteractionSource() }
     val isFocused by interactionSource.collectIsFocusedAsState()
 
     val borderColor = when {
-        errorText != null -> colors.dangerCrimson
-        isFocused -> colors.cobaltInk
-        else -> colors.borderStrong
+        errorText != null -> colors.errorLine
+        isFocused -> colors.focusLine
+        else -> colors.lineStrong
     }
 
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(4.dp)) {
         if (label.isNotEmpty()) {
             SdText(
                 text = label,
-                style = SdTheme.typo.monoTag,
-                color = if (errorText != null) colors.dangerCrimson else colors.inkSecondary
+                style = typo.fieldLabel,
+                color = if (errorText != null) colors.danger else colors.muted
             )
         }
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .defaultMinSize(minHeight = 48.dp)
+                .defaultMinSize(minHeight = if (singleLine) 38.dp else 72.dp)
                 .clip(ControlShape)
-                .background(colors.bgSurface)
-                .border(if (isFocused || errorText != null) 2.dp else 1.dp, borderColor, ControlShape)
-                .padding(horizontal = 12.dp, vertical = 10.dp),
+                .background(colors.fill)
+                .border(if (isFocused || errorText != null) 1.5.dp else 1.dp, borderColor, ControlShape)
+                .padding(horizontal = 12.dp, vertical = if (singleLine) 8.dp else 10.dp),
             contentAlignment = if (singleLine) Alignment.CenterStart else Alignment.TopStart
         ) {
             if (value.isEmpty() && placeholder.isNotEmpty()) {
                 SdText(
                     text = placeholder,
-                    style = SdTheme.typo.bodySecondary,
-                    color = colors.inkMuted
+                    style = typo.body,
+                    color = colors.faint
                 )
             }
             BasicTextField(
                 value = value,
                 onValueChange = onValueChange,
                 modifier = Modifier.fillMaxWidth(),
-                textStyle = SdTheme.typo.bodyPrimary.copy(color = colors.inkPrimary),
+                textStyle = typo.body.copy(color = colors.text),
                 singleLine = singleLine,
                 minLines = minLines,
-                cursorBrush = SolidColor(colors.signalVermilion),
+                cursorBrush = SolidColor(colors.accent),
                 visualTransformation = if (isPassword) PasswordVisualTransformation() else VisualTransformation.None,
                 interactionSource = interactionSource,
                 keyboardOptions = keyboardOptions,
@@ -363,15 +365,16 @@ fun SdTextField(
         }
         if (errorText != null) {
             SdText(
-                text = "[!] $errorText",
-                style = SdTheme.typo.bodySecondary,
-                color = colors.dangerCrimson
+                text = errorText,
+                style = typo.meta,
+                color = colors.danger,
+                fontWeight = FontWeight.SemiBold
             )
         } else if (helperText != null) {
             SdText(
                 text = helperText,
-                style = SdTheme.typo.bodySecondary,
-                color = colors.inkMuted
+                style = typo.meta,
+                color = colors.faint
             )
         }
     }
@@ -384,59 +387,53 @@ fun SdCheckboxRow(
     onCheckedChange: (Boolean) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val colors = SdTheme.colors
+    val colors = ObsidianTheme.colors
     val interactionSource = remember { MutableInteractionSource() }
-    val isFocused by interactionSource.collectIsFocusedAsState()
 
     Row(
         modifier = modifier
-            .defaultMinSize(minHeight = 48.dp)
             .clip(ControlShape)
-            .border(
-                width = if (isFocused) 2.dp else 0.dp,
-                color = if (isFocused) colors.cobaltInk else Color.Transparent,
-                shape = ControlShape
-            )
             .clickable(
                 interactionSource = interactionSource,
                 indication = null,
                 role = Role.Checkbox
             ) { onCheckedChange(!checked) }
-            .padding(horizontal = 6.dp, vertical = 8.dp),
+            .padding(horizontal = 6.dp, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(10.dp)
     ) {
         Box(
             modifier = Modifier
-                .size(22.dp)
-                .clip(TagShape)
-                .background(if (checked) colors.forestOk else colors.bgSurface)
-                .border(2.dp, if (checked) colors.forestOk else colors.borderStrong, TagShape),
+                .size(20.dp)
+                .clip(ObsidianShapes.radius6)
+                .then(
+                    if (checked) {
+                        Modifier
+                            .background(colors.goldGradient)
+                            .border(1.dp, colors.goldEdge, ObsidianShapes.radius6)
+                    } else {
+                        Modifier
+                            .background(Color.Transparent)
+                            .border(1.5.dp, colors.accent.copy(alpha = 0.5f), ObsidianShapes.radius6)
+                    }
+                ),
             contentAlignment = Alignment.Center
         ) {
             if (checked) {
-                Canvas(modifier = Modifier.size(12.dp)) {
-                    drawLine(
-                        color = colors.onForestOk,
-                        start = Offset(size.width * 0.15f, size.height * 0.55f),
-                        end = Offset(size.width * 0.42f, size.height * 0.82f),
-                        strokeWidth = 2.5.dp.toPx(),
-                        cap = StrokeCap.Square
+                BasicText(
+                    text = "✓",
+                    style = TextStyle(
+                        color = colors.onGold,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.ExtraBold
                     )
-                    drawLine(
-                        color = colors.onForestOk,
-                        start = Offset(size.width * 0.42f, size.height * 0.82f),
-                        end = Offset(size.width * 0.85f, size.height * 0.2f),
-                        strokeWidth = 2.5.dp.toPx(),
-                        cap = StrokeCap.Square
-                    )
-                }
+                )
             }
         }
         SdText(
             text = label,
-            style = SdTheme.typo.bodyPrimary,
-            color = if (checked) colors.inkSecondary else colors.inkPrimary
+            style = ObsidianTheme.typography.body,
+            color = if (checked) colors.faint else colors.text
         )
     }
 }
@@ -449,12 +446,8 @@ fun SdCard(
     onClick: (() -> Unit)? = null,
     content: @Composable ColumnScope.() -> Unit
 ) {
-    val colors = SdTheme.colors
+    val colors = ObsidianTheme.colors
     val interactionSource = remember { MutableInteractionSource() }
-    val isFocused by interactionSource.collectIsFocusedAsState()
-
-    val borderCol = if (isFocused) colors.cobaltInk else colors.borderStrong
-    val borderWidth = if (isFocused) 2.dp else 1.dp
 
     val clickableModifier = if (onClick != null) {
         Modifier
@@ -476,15 +469,15 @@ fun SdCard(
     Column(
         modifier = modifier
             .clip(PanelShape)
-            .background(colors.bgSurface)
-            .border(borderWidth, borderCol, PanelShape)
+            .background(Brush.verticalGradient(listOf(colors.surfaceTop, colors.surfaceBottom)))
+            .border(1.dp, colors.surfaceLine, PanelShape)
             .then(clickableModifier)
     ) {
         if (accentTopColor != null) {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(4.dp)
+                    .height(3.dp)
                     .background(accentTopColor)
             )
         }
@@ -503,7 +496,9 @@ fun SdSectionHeader(
     subtitle: String? = null,
     trailing: @Composable (RowScope.() -> Unit)? = null
 ) {
-    val colors = SdTheme.colors
+    val colors = ObsidianTheme.colors
+    val typo = ObsidianTheme.typography
+
     Column(
         modifier = Modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(4.dp)
@@ -521,19 +516,19 @@ fun SdSectionHeader(
                 Box(
                     modifier = Modifier
                         .clip(TagShape)
-                        .background(colors.signalVermilion)
+                        .background(colors.accent)
                         .padding(horizontal = 6.dp, vertical = 2.dp)
                 ) {
                     SdText(
                         text = indexCode,
-                        style = SdTheme.typo.monoTag,
-                        color = colors.onSignalVermilion
+                        style = typo.tag,
+                        color = colors.accentInk
                     )
                 }
                 SdText(
                     text = title,
-                    style = SdTheme.typo.sectionHeader,
-                    color = colors.inkPrimary
+                    style = typo.blockTitle,
+                    color = colors.text
                 )
             }
             if (trailing != null) {
@@ -547,41 +542,43 @@ fun SdSectionHeader(
         if (!subtitle.isNullOrBlank()) {
             SdText(
                 text = subtitle,
-                style = SdTheme.typo.bodySecondary,
-                color = colors.inkSecondary
+                style = typo.meta,
+                color = colors.muted
             )
         }
         Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(1.dp)
-                .background(colors.borderSubtle)
+                .background(colors.surfaceLine)
         )
     }
 }
 
-// Required UI States per R-27: Loading, Empty, Error (each explicit, perceivable, and actionable)
 @Composable
 fun SdLoadingState(message: String, modifier: Modifier = Modifier) {
-    val colors = SdTheme.colors
+    val colors = ObsidianTheme.colors
     SdCard(modifier = modifier.fillMaxWidth()) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Canvas(modifier = Modifier.size(16.dp)) {
-                drawRect(color = colors.cobaltInk, size = Size(size.width, size.height))
-            }
+            Box(
+                modifier = Modifier
+                    .size(10.dp)
+                    .clip(ObsidianShapes.radius6)
+                    .background(colors.accent)
+            )
             Column {
                 SdText(
-                    text = "LOADING DATA",
-                    style = SdTheme.typo.monoTag,
-                    color = colors.cobaltInk
+                    text = "MEMUAT",
+                    style = ObsidianTheme.typography.overline,
+                    color = colors.accent
                 )
                 SdText(
                     text = message,
-                    style = SdTheme.typo.bodyPrimary,
-                    color = colors.inkPrimary
+                    style = ObsidianTheme.typography.body,
+                    color = colors.text
                 )
             }
         }
@@ -596,25 +593,40 @@ fun SdEmptyState(
     onAction: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
-    val colors = SdTheme.colors
-    SdCard(modifier = modifier.fillMaxWidth()) {
-        SdText(
-            text = "[EMPTY] $title",
-            style = SdTheme.typo.cardTitle,
-            color = colors.inkPrimary
-        )
-        SdText(
-            text = causeAndNextStep,
-            style = SdTheme.typo.bodySecondary,
-            color = colors.inkSecondary
-        )
-        if (actionLabel != null && onAction != null) {
-            SdButton(
-                label = actionLabel,
-                onClick = onAction,
-                variant = SdButtonVariant.COBALT,
-                compact = true
+    val colors = ObsidianTheme.colors
+    val typo = ObsidianTheme.typography
+
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(ObsidianShapes.radius12)
+            .border(1.dp, colors.lineChip, ObsidianShapes.radius12)
+            .padding(18.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            SdText(
+                text = title,
+                style = typo.cardTitle,
+                color = colors.text
             )
+            SdText(
+                text = causeAndNextStep,
+                style = typo.body,
+                color = colors.faint
+            )
+            if (actionLabel != null && onAction != null) {
+                Spacer(modifier = Modifier.height(6.dp))
+                SdButton(
+                    label = actionLabel,
+                    onClick = onAction,
+                    variant = SdButtonVariant.SECONDARY,
+                    compact = true
+                )
+            }
         }
     }
 }
@@ -626,23 +638,23 @@ fun SdErrorState(
     onRetry: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val colors = SdTheme.colors
+    val colors = ObsidianTheme.colors
     SdCard(
         modifier = modifier.fillMaxWidth(),
-        accentTopColor = colors.dangerCrimson
+        accentTopColor = colors.danger
     ) {
         SdText(
-            text = "[ERROR] $title",
-            style = SdTheme.typo.cardTitle,
-            color = colors.dangerCrimson
+            text = title,
+            style = ObsidianTheme.typography.cardTitle,
+            color = colors.danger
         )
         SdText(
             text = cause,
-            style = SdTheme.typo.bodySecondary,
-            color = colors.inkPrimary
+            style = ObsidianTheme.typography.body,
+            color = colors.text
         )
         SdButton(
-            label = "Retry Request",
+            label = "Coba Lagi",
             onClick = onRetry,
             variant = SdButtonVariant.DANGER,
             compact = true
@@ -656,7 +668,7 @@ fun SdModalDialog(
     onDismiss: () -> Unit,
     content: @Composable ColumnScope.() -> Unit
 ) {
-    val colors = SdTheme.colors
+    val colors = ObsidianTheme.colors
     Dialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(
@@ -667,50 +679,62 @@ fun SdModalDialog(
     ) {
         Box(
             modifier = Modifier
-                .fillMaxWidth(0.94f)
-                .widthIn(max = 600.dp)
-                .clip(PanelShape)
-                .background(colors.bgSurface)
-                .border(2.dp, colors.borderStrong, PanelShape)
-                .onPreviewKeyEvent { event ->
-                    if (event.type == KeyEventType.KeyDown && event.key == Key.Escape) {
-                        onDismiss()
-                        true
-                    } else false
-                }
+                .fillMaxSize()
+                .background(colors.backdrop)
+                .clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null,
+                    onClick = onDismiss
+                )
+                .padding(16.dp),
+            contentAlignment = Alignment.Center
         ) {
-            Column(
+            Box(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .verticalScroll(rememberScrollState())
-                    .padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
+                    .fillMaxWidth(0.95f)
+                    .widthIn(max = 640.dp)
+                    .clip(ObsidianShapes.radius18)
+                    .background(Brush.verticalGradient(listOf(colors.surfaceTop, colors.surfaceBottom)))
+                    .border(1.dp, colors.surfaceLine, ObsidianShapes.radius18)
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null,
+                        onClick = {}
+                    )
             ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    SdText(
-                        text = title,
-                        style = SdTheme.typo.sectionHeader,
-                        color = colors.inkPrimary,
-                        modifier = Modifier.weight(1f)
-                    )
-                    SdButton(
-                        label = "Close [Esc]",
-                        onClick = onDismiss,
-                        variant = SdButtonVariant.SECONDARY,
-                        compact = true
-                    )
-                }
-                Box(
+                Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(1.dp)
-                        .background(colors.borderSubtle)
-                )
-                content()
+                        .verticalScroll(rememberScrollState())
+                        .padding(22.dp),
+                    verticalArrangement = Arrangement.spacedBy(14.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        SdText(
+                            text = title,
+                            style = ObsidianTheme.typography.modalTitle,
+                            color = colors.text,
+                            modifier = Modifier.weight(1f)
+                        )
+                        SdButton(
+                            label = "Tutup",
+                            onClick = onDismiss,
+                            variant = SdButtonVariant.SECONDARY,
+                            compact = true
+                        )
+                    }
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(1.dp)
+                            .background(colors.line)
+                    )
+                    content()
+                }
             }
         }
     }
@@ -722,7 +746,7 @@ object SdTimeFormatter {
     private val dtf = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")
 
     fun formatEpochSecWib(epochSec: Long?): String {
-        if (epochSec == null || epochSec <= 0L) return "not set"
+        if (epochSec == null || epochSec <= 0L) return "Belum diatur"
         return try {
             Instant.ofEpochSecond(epochSec).atZone(wibZone).format(dtf) + " WIB"
         } catch (_: Exception) {
