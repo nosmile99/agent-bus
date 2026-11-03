@@ -21,7 +21,8 @@ enum class AdminDestination(val code: String, val label: String) {
     BOARD("02", "Board"),
     NEEDS("03", "Needs"),
     AGENTS("04", "Agents"),
-    OPS("05", "Ops")
+    OPS("05", "Ops"),
+    CONSOLE("06", "API Console")
 }
 
 data class OneTimeSecretNotice(

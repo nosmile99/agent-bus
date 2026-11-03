@@ -794,4 +794,319 @@ class AgentBusApiClient(
             )
         )
     }
+
+    // ------------------------------------------------------------------------
+    // Section 14: Audit Purge
+    // ------------------------------------------------------------------------
+    suspend fun purgeAudit(olderThanSec: Long = 86400L, dryRun: Boolean = false): AuditPurgeResponse =
+        request(
+            method = "POST",
+            path = "/admin/api/audit/purge",
+            bodyJson = json.encodeToString(AuditPurgeRequest(olderThanSec, dryRun))
+        )
+
+    // ------------------------------------------------------------------------
+    // Section 15: Cutover (Admin & Agent)
+    // ------------------------------------------------------------------------
+    suspend fun getCutoverStatus(asAgent: Boolean = false): CutoverStatusResponse =
+        request("GET", if (asAgent) "/api/cutover" else "/admin/api/cutover")
+
+    suspend fun updateCutoverChecklist(item: String, done: Boolean): CutoverStatusResponse =
+        request(
+            method = "POST",
+            path = "/admin/api/cutover/checklist",
+            bodyJson = json.encodeToString(CutoverChecklistRequest(item, done))
+        )
+
+    suspend fun flipCutover(direction: String = "v12", force: Boolean = false): CutoverStatusResponse =
+        request(
+            method = "POST",
+            path = "/admin/api/cutover/flip",
+            bodyJson = json.encodeToString(CutoverFlipRequest(direction, force))
+        )
+
+    // ------------------------------------------------------------------------
+    // Section 16: Task Dependencies & Events
+    // ------------------------------------------------------------------------
+    suspend fun getTaskDependencies(taskId: Int, asAgent: Boolean = false): TaskDependenciesResponse =
+        request("GET", if (asAgent) "/api/kanban/tasks/$taskId/dependencies" else "/admin/api/kanban/tasks/$taskId/dependencies")
+
+    suspend fun addTaskDependency(taskId: Int, blockerId: Int, reason: String = "", asAgent: Boolean = false): BasicOkResponse =
+        request(
+            method = "POST",
+            path = if (asAgent) "/api/kanban/tasks/$taskId/dependencies" else "/admin/api/kanban/tasks/$taskId/dependencies",
+            bodyJson = json.encodeToString(AddDependencyRequest(blockerId, reason))
+        )
+
+    suspend fun removeTaskDependency(taskId: Int, blockerId: Int, asAgent: Boolean = false): BasicOkResponse =
+        request(
+            method = "DELETE",
+            path = if (asAgent) "/api/kanban/tasks/$taskId/dependencies/$blockerId" else "/admin/api/kanban/tasks/$taskId/dependencies/$blockerId"
+        )
+
+    suspend fun getTaskDependencyEvents(taskId: Int, asAgent: Boolean = false): DependencyEventsResponse =
+        request("GET", if (asAgent) "/api/kanban/tasks/$taskId/dependencies/events" else "/admin/api/kanban/tasks/$taskId/dependencies/events")
+
+    // ------------------------------------------------------------------------
+    // Section 17: Comments Restore & Soft-Delete
+    // ------------------------------------------------------------------------
+    suspend fun restoreTaskComment(taskId: Int, commentId: Int, asAgent: Boolean = false): BasicOkResponse =
+        request("POST", if (asAgent) "/api/kanban/tasks/$taskId/comments/$commentId/restore" else "/admin/api/kanban/tasks/$taskId/comments/$commentId/restore")
+
+    suspend fun softDeleteTaskComment(taskId: Int, commentId: Int): BasicOkResponse =
+        request("POST", "/admin/api/kanban/tasks/$taskId/comments/$commentId/soft-delete")
+
+    // ------------------------------------------------------------------------
+    // Section 18: Kanban Task Queries & Actions
+    // ------------------------------------------------------------------------
+    suspend fun getUnblockedTasks(asAgent: Boolean = false): TasksResponse =
+        request("GET", if (asAgent) "/api/kanban/tasks/unblocked" else "/admin/api/kanban/tasks/unblocked")
+
+    suspend fun getAvailableTasks(): TasksResponse =
+        request("GET", "/api/kanban/tasks/available")
+
+    suspend fun rescueTask(taskId: Int, asAgent: Boolean = false): BasicOkResponse =
+        request("POST", if (asAgent) "/api/kanban/tasks/$taskId/rescue" else "/admin/api/kanban/tasks/$taskId/rescue")
+
+    suspend fun claimTask(taskId: Int, agent: String): BasicOkResponse =
+        request(
+            method = "POST",
+            path = "/api/kanban/tasks/$taskId/claim",
+            bodyJson = json.encodeToString(JsonObject(mapOf("agent" to JsonPrimitive(agent))))
+        )
+
+    suspend fun releaseTask(taskId: Int, agent: String): BasicOkResponse =
+        request(
+            method = "POST",
+            path = "/api/kanban/tasks/$taskId/release",
+            bodyJson = json.encodeToString(JsonObject(mapOf("agent" to JsonPrimitive(agent))))
+        )
+
+    suspend fun updateTaskDueDate(taskId: Int, dueDate: String): BasicOkResponse =
+        request(
+            method = "PUT",
+            path = "/api/kanban/tasks/$taskId/due_date",
+            bodyJson = json.encodeToString(JsonObject(mapOf("due_date" to JsonPrimitive(dueDate))))
+        )
+
+    suspend fun updateTaskLane(taskId: Int, lane: String): BasicOkResponse =
+        request(
+            method = "PUT",
+            path = "/api/kanban/tasks/$taskId/lane",
+            bodyJson = json.encodeToString(JsonObject(mapOf("lane" to JsonPrimitive(lane))))
+        )
+
+    suspend fun updateTaskNotes(taskId: Int, notes: String): BasicOkResponse =
+        request(
+            method = "PUT",
+            path = "/api/kanban/tasks/$taskId/notes",
+            bodyJson = json.encodeToString(JsonObject(mapOf("notes" to JsonPrimitive(notes))))
+        )
+
+    suspend fun updateTaskStatus(taskId: Int, status: String): BasicOkResponse =
+        request(
+            method = "PUT",
+            path = "/api/kanban/tasks/$taskId/status",
+            bodyJson = json.encodeToString(JsonObject(mapOf("status" to JsonPrimitive(status))))
+        )
+
+    suspend fun getSweepHealth(): SweepHealthResponse =
+        request("GET", "/api/kanban/sweep-health")
+
+    // ------------------------------------------------------------------------
+    // Section 19: Ledger Operations (Admin & Agent)
+    // ------------------------------------------------------------------------
+    suspend fun getLedgerEntries(asAgent: Boolean = false): LedgerResponse =
+        request("GET", if (asAgent) "/api/ledger" else "/admin/api/ledger")
+
+    suspend fun createLedgerEntry(title: String, statement: String, author: String): BasicOkIdResponse =
+        request(
+            method = "POST",
+            path = "/api/ledger",
+            bodyJson = json.encodeToString(
+                JsonObject(
+                    mapOf(
+                        "title" to JsonPrimitive(title),
+                        "statement" to JsonPrimitive(statement),
+                        "author" to JsonPrimitive(author)
+                    )
+                )
+            )
+        )
+
+    suspend fun getLedgerEntry(id: Int, asAgent: Boolean = false): LedgerEntryDetailResponse =
+        request("GET", if (asAgent) "/api/ledger/$id" else "/admin/api/ledger/$id")
+
+    suspend fun flagLedgerContradiction(id: Int, reason: String, asAgent: Boolean = false): BasicOkResponse =
+        request(
+            method = "POST",
+            path = if (asAgent) "/api/ledger/$id/contradiction" else "/admin/api/ledger/$id/contradiction",
+            bodyJson = json.encodeToString(LedgerActionRequest(reason))
+        )
+
+    suspend fun demoteLedgerEntry(id: Int, reason: String): BasicOkResponse =
+        request(
+            method = "POST",
+            path = "/admin/api/ledger/$id/demote",
+            bodyJson = json.encodeToString(LedgerActionRequest(reason))
+        )
+
+    suspend fun getLedgerEvents(id: Int, asAgent: Boolean = false): LedgerEventsResponse =
+        request("GET", if (asAgent) "/api/ledger/$id/events" else "/admin/api/ledger/$id/events")
+
+    suspend fun recheckLedgerAssignment(id: Int): BasicOkResponse =
+        request("POST", "/admin/api/ledger/$id/recheck-assignment")
+
+    suspend fun resolveLedgerDissent(id: Int, resolution: String, asAgent: Boolean = false): BasicOkResponse =
+        request(
+            method = "POST",
+            path = if (asAgent) "/api/ledger/$id/resolve-dissent" else "/admin/api/ledger/$id/resolve-dissent",
+            bodyJson = json.encodeToString(LedgerActionRequest(resolution))
+        )
+
+    suspend fun assignLedgerResolver(id: Int, resolver: String, asAgent: Boolean = false): BasicOkResponse =
+        request(
+            method = "POST",
+            path = if (asAgent) "/api/ledger/$id/resolver" else "/admin/api/ledger/$id/resolver",
+            bodyJson = json.encodeToString(LedgerActionRequest(reason = "assign", target = resolver))
+        )
+
+    suspend fun supersedeLedgerEntry(id: Int, supersededBy: Int, asAgent: Boolean = false): BasicOkResponse =
+        request(
+            method = "POST",
+            path = if (asAgent) "/api/ledger/$id/supersede" else "/admin/api/ledger/$id/supersede",
+            bodyJson = json.encodeToString(LedgerActionRequest(reason = "superseded", target = supersededBy.toString()))
+        )
+
+    suspend fun tombstoneLedgerEntry(id: Int, reason: String, asAgent: Boolean = false): BasicOkResponse =
+        request(
+            method = "POST",
+            path = if (asAgent) "/api/ledger/$id/tombstone" else "/admin/api/ledger/$id/tombstone",
+            bodyJson = json.encodeToString(LedgerActionRequest(reason))
+        )
+
+    suspend fun seedLedger(count: Int = 5, reset: Boolean = false): BasicOkResponse =
+        request(
+            method = "POST",
+            path = "/admin/api/ledger/seed",
+            bodyJson = json.encodeToString(LedgerSeedRequest(count, reset))
+        )
+
+    // ------------------------------------------------------------------------
+    // Section 20: Discovery, Wake & Core Endpoints
+    // ------------------------------------------------------------------------
+    suspend fun getDiscovery(): DiscoveryResponse =
+        request("GET", "/api/discovery")
+
+    suspend fun wakeAgent(agentName: String): WakeResponse =
+        request("GET", "/api/wake?agent=${encodePathSegment(agentName)}")
+
+    suspend fun getHealth(): String = withContext(Dispatchers.IO) {
+        val fullUrl = URL(currentBaseUrl + "/health")
+        val conn = (fullUrl.openConnection() as HttpURLConnection).apply {
+            requestMethod = "GET"
+            connectTimeout = 8_000
+            readTimeout = 8_000
+        }
+        val stream = if (conn.responseCode in 200..299) conn.inputStream else conn.errorStream
+        stream?.bufferedReader()?.use { it.readText() } ?: "{}"
+    }
+
+    suspend fun getPublicList(): String = withContext(Dispatchers.IO) {
+        val fullUrl = URL(currentBaseUrl + "/list")
+        val conn = (fullUrl.openConnection() as HttpURLConnection).apply {
+            requestMethod = "GET"
+            connectTimeout = 8_000
+            readTimeout = 8_000
+        }
+        val stream = if (conn.responseCode in 200..299) conn.inputStream else conn.errorStream
+        stream?.bufferedReader()?.use { it.readText() } ?: "{}"
+    }
+
+    // ------------------------------------------------------------------------
+    // Section 21: Generic Route Executor for 100% Route Coverage & API Console
+    // ------------------------------------------------------------------------
+    suspend fun executeRoute(
+        route: RouteDescriptor,
+        pathParams: Map<String, String> = emptyMap(),
+        queryParams: List<Pair<String, String?>> = emptyList(),
+        bodyJson: String? = null,
+        useAdminToken: Boolean = false
+    ): RouteExecutionResult = withContext(Dispatchers.IO) {
+        val startTime = System.currentTimeMillis()
+        var resolvedPath = route.path
+
+        // Replace route path parameters like :id, :agent, :channel, :comment_id, :blocker_id, :label
+        // Also strip regexp like {[0-9]+} or {.+}
+        resolvedPath = resolvedPath
+            .replace("{[0-9]+}", "")
+            .replace("{.+}", "")
+
+        for ((key, value) in pathParams) {
+            val encoded = encodePathSegment(value)
+            resolvedPath = resolvedPath
+                .replace(":$key", encoded)
+        }
+
+        // Fill default placeholders if not supplied
+        resolvedPath = resolvedPath
+            .replace(":id", pathParams["id"] ?: "1")
+            .replace(":agent", pathParams["agent"] ?: "default-agent")
+            .replace(":channel", pathParams["channel"] ?: "general")
+            .replace(":comment_id", pathParams["comment_id"] ?: "1")
+            .replace(":blocker_id", pathParams["blocker_id"] ?: "2")
+            .replace(":label", pathParams["label"] ?: "dev")
+
+        val queryString = buildQuery(queryParams)
+        val fullUrl = URL(currentBaseUrl + resolvedPath + queryString)
+        val method = if (route.method == "ALL") "GET" else route.method
+
+        try {
+            val conn = (fullUrl.openConnection() as HttpURLConnection).apply {
+                requestMethod = method
+                connectTimeout = 15_000
+                readTimeout = 20_000
+                setRequestProperty("Accept", "application/json, text/plain, */*")
+                if (useAdminToken) {
+                    setRequestProperty("X-Admin-Token", adminToken)
+                } else if (hasCredentials()) {
+                    setRequestProperty("Authorization", basicAuthHeader())
+                }
+                if (bodyJson != null && method in listOf("POST", "PUT", "PATCH")) {
+                    doOutput = true
+                    setRequestProperty("Content-Type", "application/json; charset=utf-8")
+                }
+            }
+
+            if (bodyJson != null && method in listOf("POST", "PUT", "PATCH")) {
+                conn.outputStream.bufferedWriter().use { it.write(bodyJson) }
+            }
+
+            val statusCode = conn.responseCode
+            val stream = if (statusCode in 200..299) conn.inputStream else (conn.errorStream ?: conn.inputStream)
+            val responseText = stream?.bufferedReader()?.use { it.readText() } ?: ""
+            val latency = System.currentTimeMillis() - startTime
+
+            RouteExecutionResult(
+                routeId = route.id,
+                method = route.method,
+                path = resolvedPath + queryString,
+                statusCode = statusCode,
+                latencyMs = latency,
+                responseBody = responseText,
+                isSuccess = statusCode in 200..299
+            )
+        } catch (e: Exception) {
+            val latency = System.currentTimeMillis() - startTime
+            RouteExecutionResult(
+                routeId = route.id,
+                method = route.method,
+                path = resolvedPath + queryString,
+                statusCode = 0,
+                latencyMs = latency,
+                responseBody = "Error: ${e.message}",
+                isSuccess = false
+            )
+        }
+    }
 }

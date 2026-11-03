@@ -11,6 +11,7 @@ import com.agentbus.admin.model.*
 import com.agentbus.admin.state.AdminAppController
 import com.agentbus.admin.ui.components.*
 import com.agentbus.admin.ui.theme.SdTheme
+import kotlinx.coroutines.launch
 
 @Composable
 fun TaskDetailModal(
@@ -407,6 +408,130 @@ fun TaskDetailModal(
                         }
                     },
                     variant = SdButtonVariant.PRIMARY,
+                    compact = true
+                )
+            }
+        }
+
+        // Section 9: Task Dependencies & Unblock Rescue (v12)
+        var blockerInput by remember { mutableStateOf("") }
+        var dependencyMsg by remember { mutableStateOf<String?>(null) }
+        var dependenciesList by remember { mutableStateOf<List<TaskDependencyRecord>>(emptyList()) }
+        val scope = rememberCoroutineScope()
+
+        SdCard(padding = 10.dp) {
+            SdText(
+                text = "TASK DEPENDENCIES & RESCUE (/admin/api/kanban/tasks/${task.id}/dependencies)",
+                style = SdTheme.typo.monoTag
+            )
+            if (dependencyMsg != null) {
+                SdText(
+                    text = dependencyMsg ?: "",
+                    style = SdTheme.typo.bodySecondary,
+                    color = colors.signalVermilion
+                )
+            }
+
+            Row(
+                modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                SdButton(
+                    label = "Load Dependencies",
+                    onClick = {
+                        scope.launch {
+                            try {
+                                val res = controller.apiClient.getTaskDependencies(task.id)
+                                dependenciesList = res.dependencies
+                                dependencyMsg = "Loaded ${res.dependencies.size} blockers."
+                            } catch (e: Exception) {
+                                dependencyMsg = "Error: ${e.message}"
+                            }
+                        }
+                    },
+                    variant = SdButtonVariant.COBALT,
+                    compact = true
+                )
+                SdButton(
+                    label = "Rescue Task (Clear Blockers)",
+                    onClick = {
+                        scope.launch {
+                            try {
+                                val res = controller.apiClient.rescueTask(task.id)
+                                dependencyMsg = "Task rescued: ok=${res.ok}"
+                            } catch (e: Exception) {
+                                dependencyMsg = "Error: ${e.message}"
+                            }
+                        }
+                    },
+                    variant = SdButtonVariant.PRIMARY,
+                    compact = true
+                )
+            }
+
+            if (dependenciesList.isNotEmpty()) {
+                dependenciesList.forEach { dep ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        SdText(
+                            text = "Blocked by Task #${dep.blockerId}: ${dep.reason}",
+                            style = SdTheme.typo.bodySecondary
+                        )
+                        SdButton(
+                            label = "Remove",
+                            onClick = {
+                                scope.launch {
+                                    try {
+                                        controller.apiClient.removeTaskDependency(task.id, dep.blockerId)
+                                        dependenciesList = dependenciesList.filterNot { it.blockerId == dep.blockerId }
+                                        dependencyMsg = "Removed blocker #${dep.blockerId}."
+                                    } catch (e: Exception) {
+                                        dependencyMsg = "Error: ${e.message}"
+                                    }
+                                }
+                            },
+                            variant = SdButtonVariant.DANGER,
+                            compact = true
+                        )
+                    }
+                }
+            }
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.Bottom
+            ) {
+                SdTextField(
+                    value = blockerInput,
+                    onValueChange = { blockerInput = it.filter { c -> c.isDigit() } },
+                    label = "ADD BLOCKER TASK ID",
+                    placeholder = "Task ID",
+                    modifier = Modifier.weight(1f)
+                )
+                SdButton(
+                    label = "Add Blocker",
+                    enabled = blockerInput.isNotBlank(),
+                    onClick = {
+                        val blockerId = blockerInput.toIntOrNull()
+                        if (blockerId != null) {
+                            scope.launch {
+                                try {
+                                    controller.apiClient.addTaskDependency(task.id, blockerId, "Added from UI")
+                                    blockerInput = ""
+                                    val res = controller.apiClient.getTaskDependencies(task.id)
+                                    dependenciesList = res.dependencies
+                                    dependencyMsg = "Blocker #$blockerId added."
+                                } catch (e: Exception) {
+                                    dependencyMsg = "Error: ${e.message}"
+                                }
+                            }
+                        }
+                    },
+                    variant = SdButtonVariant.SECONDARY,
                     compact = true
                 )
             }

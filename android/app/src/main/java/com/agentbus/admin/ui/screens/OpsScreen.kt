@@ -432,6 +432,203 @@ fun OpsScreen(controller: AdminAppController) {
             )
         }
 
+        // Section 14: Cutover Management
+        SdSectionHeader(
+            indexCode = "SEC-14",
+            title = "Backend Cutover Management (/admin/api/cutover)",
+            subtitle = "Manage migration checklist and flip live traffic direction between backend versions."
+        )
+
+        var cutoverTarget by remember { mutableStateOf("v12") }
+        var cutoverCheckItem by remember { mutableStateOf("db_migration") }
+        var cutoverStatusMsg by remember { mutableStateOf<String?>(null) }
+
+        SdCard(padding = 12.dp) {
+            SdText(
+                text = "CUTOVER ACTIONS",
+                style = SdTheme.typo.monoTag
+            )
+            if (cutoverStatusMsg != null) {
+                SdText(
+                    text = cutoverStatusMsg ?: "",
+                    style = SdTheme.typo.bodySecondary,
+                    color = colors.signalVermilion
+                )
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                SdButton(
+                    label = "Check Cutover Status",
+                    onClick = {
+                        scope.launch {
+                            try {
+                                val res = controller.apiClient.getCutoverStatus()
+                                cutoverStatusMsg = "Status: ${res.status} | Target: ${res.target} | Flipped: ${res.flipped}"
+                            } catch (e: Exception) {
+                                cutoverStatusMsg = "Error: ${e.message}"
+                            }
+                        }
+                    },
+                    variant = SdButtonVariant.COBALT,
+                    compact = true
+                )
+                SdButton(
+                    label = "Mark Checklist: $cutoverCheckItem",
+                    onClick = {
+                        scope.launch {
+                            try {
+                                val res = controller.apiClient.updateCutoverChecklist(cutoverCheckItem, true)
+                                cutoverStatusMsg = "Checklist updated: ${res.status}"
+                            } catch (e: Exception) {
+                                cutoverStatusMsg = "Error: ${e.message}"
+                            }
+                        }
+                    },
+                    variant = SdButtonVariant.SECONDARY,
+                    compact = true
+                )
+                SdButton(
+                    label = "Flip to $cutoverTarget",
+                    onClick = {
+                        scope.launch {
+                            try {
+                                val res = controller.apiClient.flipCutover(cutoverTarget, force = true)
+                                cutoverStatusMsg = "Flipped to ${res.target}: ${res.status}"
+                            } catch (e: Exception) {
+                                cutoverStatusMsg = "Error: ${e.message}"
+                            }
+                        }
+                    },
+                    variant = SdButtonVariant.PRIMARY,
+                    compact = true
+                )
+            }
+        }
+
+        // Section 15: Decision Ledger & Dissent
+        SdSectionHeader(
+            indexCode = "SEC-15",
+            title = "Decision Ledger & Dissent Tracking (/admin/api/ledger)",
+            subtitle = "Authority note: MEMORY.md is authoritative; ledger annotations track dissent and contradictions."
+        )
+
+        var ledgerTitle by remember { mutableStateOf("") }
+        var ledgerStatement by remember { mutableStateOf("") }
+        var ledgerStatusMsg by remember { mutableStateOf<String?>(null) }
+
+        SdCard(padding = 12.dp) {
+            SdText(
+                text = "LEDGER CONTROLS",
+                style = SdTheme.typo.monoTag
+            )
+            if (ledgerStatusMsg != null) {
+                SdText(
+                    text = ledgerStatusMsg ?: "",
+                    style = SdTheme.typo.bodySecondary,
+                    color = colors.forestOk
+                )
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                SdButton(
+                    label = "List Ledger Entries",
+                    onClick = {
+                        scope.launch {
+                            try {
+                                val res = controller.apiClient.getLedgerEntries()
+                                ledgerStatusMsg = "Loaded ${res.entries.size} ledger entries."
+                            } catch (e: Exception) {
+                                ledgerStatusMsg = "Error: ${e.message}"
+                            }
+                        }
+                    },
+                    variant = SdButtonVariant.COBALT,
+                    compact = true
+                )
+                SdButton(
+                    label = "Seed Sample Entries",
+                    onClick = {
+                        scope.launch {
+                            try {
+                                val res = controller.apiClient.seedLedger(count = 3, reset = false)
+                                ledgerStatusMsg = "Seed completed: ok=${res.ok}"
+                            } catch (e: Exception) {
+                                ledgerStatusMsg = "Error: ${e.message}"
+                            }
+                        }
+                    },
+                    variant = SdButtonVariant.SECONDARY,
+                    compact = true
+                )
+            }
+        }
+
+        // Section 16: Audit Purge & Sweep Health
+        SdSectionHeader(
+            indexCode = "SEC-16",
+            title = "Audit Purge & Sweep Health (/admin/api/audit/purge & /api/kanban/sweep-health)",
+            subtitle = "Perform log hygiene and verify kanban sweep worker health."
+        )
+
+        var purgeStatusMsg by remember { mutableStateOf<String?>(null) }
+
+        SdCard(padding = 12.dp) {
+            if (purgeStatusMsg != null) {
+                SdText(
+                    text = purgeStatusMsg ?: "",
+                    style = SdTheme.typo.bodySecondary,
+                    color = colors.signalVermilion
+                )
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                SdButton(
+                    label = "Purge Audit Logs (>24h)",
+                    onClick = {
+                        scope.launch {
+                            try {
+                                val res = controller.apiClient.purgeAudit(olderThanSec = 86400L, dryRun = false)
+                                purgeStatusMsg = "Purged ${res.purgedCount} log entries."
+                            } catch (e: Exception) {
+                                purgeStatusMsg = "Error: ${e.message}"
+                            }
+                        }
+                    },
+                    variant = SdButtonVariant.DANGER,
+                    compact = true
+                )
+                SdButton(
+                    label = "Check Sweep Health",
+                    onClick = {
+                        scope.launch {
+                            try {
+                                val res = controller.apiClient.getSweepHealth()
+                                purgeStatusMsg = "Sweep Health: ${res.status} (count=${res.sweepCount}, last=${res.lastSweep ?: "none"})"
+                            } catch (e: Exception) {
+                                purgeStatusMsg = "Error: ${e.message}"
+                            }
+                        }
+                    },
+                    variant = SdButtonVariant.COBALT,
+                    compact = true
+                )
+                SdButton(
+                    label = "Open 124-Route API Console",
+                    onClick = {
+                        controller.navigateTo(com.agentbus.admin.state.AdminDestination.CONSOLE)
+                    },
+                    variant = SdButtonVariant.PRIMARY,
+                    compact = true
+                )
+            }
+        }
+
         Spacer(modifier = Modifier.height(24.dp))
     }
 }

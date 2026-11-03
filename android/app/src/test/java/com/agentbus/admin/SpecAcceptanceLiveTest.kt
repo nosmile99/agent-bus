@@ -54,6 +54,19 @@ class SpecAcceptanceLiveTest {
         assertTrue(ValidationRules.isSystemManagedChannel("dm:alice:bob"))
         assertTrue(ValidationRules.isSystemManagedChannel("all-agent"))
         assertFalse(ValidationRules.isSystemManagedChannel("general"))
+
+        // Verify 100% backend v12 route coverage registry
+        assertEquals(124, com.agentbus.admin.network.RouteRegistry.ALL_ROUTES.size)
+        assertEquals(72, com.agentbus.admin.network.RouteRegistry.ALL_ROUTES.count { it.group == com.agentbus.admin.model.RouteGroup.ADMIN })
+        assertEquals(45, com.agentbus.admin.network.RouteRegistry.ALL_ROUTES.count { it.group == com.agentbus.admin.model.RouteGroup.AGENT })
+        assertEquals(7, com.agentbus.admin.network.RouteRegistry.ALL_ROUTES.count { it.group == com.agentbus.admin.model.RouteGroup.CORE })
+
+        // Verify route descriptors have valid IDs and HTTP methods
+        for (r in com.agentbus.admin.network.RouteRegistry.ALL_ROUTES) {
+            assertTrue("Route ID positive", r.id > 0)
+            assertTrue("Method valid", r.method in listOf("GET", "POST", "PUT", "DELETE", "ALL"))
+            assertTrue("Path starts with /", r.path.startsWith("/"))
+        }
         assertEquals(
             listOf("service", "env"),
             ValidationRules.extractTemplatePlaceholders(

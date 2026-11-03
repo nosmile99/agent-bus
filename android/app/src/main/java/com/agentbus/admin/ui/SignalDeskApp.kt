@@ -50,6 +50,7 @@ import com.agentbus.admin.ui.components.SdTag
 import com.agentbus.admin.ui.components.SdText
 import com.agentbus.admin.ui.components.SdTextField
 import com.agentbus.admin.ui.screens.AgentsScreen
+import com.agentbus.admin.ui.screens.ApiConsoleScreen
 import com.agentbus.admin.ui.screens.BoardScreen
 import com.agentbus.admin.ui.screens.FeedScreen
 import com.agentbus.admin.ui.screens.LoginScreen
@@ -539,6 +540,7 @@ private fun DestinationViewport(controller: AdminAppController, screenWidthDp: I
         AdminDestination.NEEDS -> NeedsScreen(controller = controller)
         AdminDestination.AGENTS -> AgentsScreen(controller = controller)
         AdminDestination.OPS -> OpsScreen(controller = controller)
+        AdminDestination.CONSOLE -> ApiConsoleScreen(controller = controller)
     }
 }
 
@@ -607,25 +609,25 @@ private fun NavDestinationItem(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val colors = SdTheme.colors
+    val obsColors = com.agentbus.admin.ui.theme.ObsidianTheme.colors
     val interactionSource = remember { MutableInteractionSource() }
     val isFocused by interactionSource.collectIsFocusedAsState()
-    val shape = RoundedCornerShape(4.dp)
+    val shape = com.agentbus.admin.ui.theme.ObsidianShapes.radius10
 
-    val bg = if (selected) colors.signalVermilion else colors.bgSubtle
-    val fg = if (selected) colors.onSignalVermilion else colors.inkPrimary
+    val bgBrush = if (selected) obsColors.goldGradient else androidx.compose.ui.graphics.SolidColor(obsColors.fill)
+    val fg = if (selected) obsColors.onGold else obsColors.textDim
     val border = when {
-        isFocused -> colors.cobaltInk
-        selected -> colors.signalVermilion
-        else -> colors.borderStrong
+        isFocused -> obsColors.focusLine
+        selected -> obsColors.goldEdge
+        else -> obsColors.lineChip
     }
 
     Box(
         modifier = modifier
-            .heightIn(min = 44.dp)
+            .heightIn(min = 40.dp)
             .clip(shape)
-            .background(bg, shape)
-            .border(if (isFocused) 2.dp else 1.dp, border, shape)
+            .background(bgBrush)
+            .border(1.dp, border, shape)
             .focusable(interactionSource = interactionSource)
             .onKeyEvent { event ->
                 if (event.type == KeyEventType.KeyDown &&
@@ -648,8 +650,8 @@ private fun NavDestinationItem(
     ) {
         SdText(
             text = label,
-            style = SdTheme.typo.monoTag,
-            fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+            style = com.agentbus.admin.ui.theme.ObsidianTheme.typography.label,
+            fontWeight = if (selected) FontWeight.Bold else FontWeight.SemiBold,
             color = fg,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis

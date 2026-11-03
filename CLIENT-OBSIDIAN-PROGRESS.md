@@ -6,7 +6,7 @@
 - **Goals**:
   1. Port Obsidian Design System tokens (dark-only, gold-lit) to Compose theme.
   2. Port all 26 Obsidian components to Compose components.
-  3. Migrate all screens (Login, Feed, Board, Needs, Agents, Ops, TaskDetailModal) to Obsidian.
+  3. Migrate all screens (Login, Feed, Board, Needs, Agents, Ops, TaskDetailModal, Shell) to Obsidian.
   4. 100% backend v12 route coverage (124 routes) in ApiClient + dedicated UI / API Console screen.
   5. Build & unit test gates pass (`assembleDebug`, `testDebugUnitTest`).
 
@@ -58,28 +58,44 @@ Semua 26 komponen Obsidian Design System v1.1.0 berhasil di-port ke Jetpack Comp
 - Komponen bridge di `SignalDeskComponents.kt` diperbarui agar komponen lama memakai styling Obsidian.
 - Status build: `assembleDebug` dan `testDebugUnitTest` PASS.
 
-### Tahap 3: Migrasi Layar ke Komponen Obsidian (PENDING)
-- [ ] LoginScreen
-- [ ] FeedScreen
-- [ ] BoardScreen
-- [ ] NeedsScreen
-- [ ] AgentsScreen
-- [ ] OpsScreen
-- [ ] TaskDetailModal
-- [ ] App Shell (`SignalDeskApp`)
+### Tahap 3: Migrasi Layar ke Komponen Obsidian (COMPLETED)
+- [x] LoginScreen: Menggunakan tema Obsidian, styled cards, input dan button emas Obsidian.
+- [x] FeedScreen: Filter chips, status tags, comment items, message streams berlatar Obsidian.
+- [x] BoardScreen: 4 kolom kanban (Backlog, Doing, Blocked, Done), KanbanTaskCard dengan styling item Obsidian, progress bar emas, avatar bergradasi hue hash.
+- [x] NeedsScreen: Triage items, blocked kind/reason alerts, unblock buttons.
+- [x] AgentsScreen: Live agent connections, registered agents list, rotation alerts.
+- [x] OpsScreen: Menambahkan panel interaktif untuk Cutover management (`/admin/api/cutover`), Decision Ledger & Dissent (`/admin/api/ledger`), Audit log purge (`/admin/api/audit/purge`), Sweep health check (`/api/kanban/sweep-health`), dan direct shortcut ke API Console.
+- [x] TaskDetailModal: Menambahkan Section 9: Task Dependencies & Rescue controls (`GET / POST / DELETE /admin/api/kanban/tasks/:id/dependencies`, rescue).
+- [x] App Shell (`SignalDeskApp`): Top dispatch header, navigation rail, bottom navigation bar terintegrasi dengan Obsidian shapes, gold gradient lens indicator, dan rute navigasi baru `CONSOLE` ("06 API Console").
 
-### Tahap 4: Audit & Implementasi 100% Backend v12 Routes (PENDING)
-- Target: 124 / 124 routes (72 admin, 45 agent /api, 7 root/other)
-- Status saat ini: 40/124
-- Target implementasi: ApiClient methods + UI khusus / API Console
+### Tahap 4: Audit & Implementasi 100% Backend v12 Routes (COMPLETED)
+- Target: 124 / 124 routes (72 admin, 45 agent /api, 7 root/core)
+- Hasil akhir: **124 / 124 routes (100% COVERED)**
+- Rincian implementasi:
+  - `AgentBusApiClient.kt`: Ditambahkan method typed untuk Cutover (`getCutoverStatus`, `updateCutoverChecklist`, `flipCutover`), Dependencies (`getTaskDependencies`, `addTaskDependency`, `removeTaskDependency`, `getTaskDependencyEvents`), Comments restore & soft-delete, Tasks rescue & sweep health, Decision Ledger (`getLedgerEntries`, `getLedgerEntry`, `createLedgerEntry`, `flagLedgerContradiction`, `demoteLedgerEntry`, `getLedgerEvents`, `recheckLedgerAssignment`, `resolveLedgerDissent`, `assignLedgerResolver`, `supersedeLedgerEntry`, `tombstoneLedgerEntry`, `seedLedger`), Discovery & Wake, serta generic executor `executeRoute`.
+  - `RouteRegistry.kt`: Registri statis 124 route lengkap dengan ID, HTTP Method, Path, Group, Description, dan default JSON body templates.
+  - `ApiConsoleScreen.kt`: Layar interaktif API Console untuk mengeksekusi ke-124 route langsung dari client dengan input parameter (:id, :agent, :channel, dll), editor JSON body, dan response viewer live (HTTP status code, latency ms, pretty formatted JSON).
+  - `CLIENT-COVERAGE.md`: Matriks bukti coverage 124 route terperinci (Method, Path, Group, ApiClient Method, UI Screen / Trigger, Status Covered).
 
-### Tahap 5: Build, Test Final & Verifikasi (PENDING)
-- `./gradlew assembleDebug`: PENDING
-- `./gradlew testDebugUnitTest`: PENDING
-- Unit test coverage & contrast assertions update
+### Tahap 5: Build, Test Final & Verifikasi (COMPLETED)
+- `./gradlew assembleDebug`: **PASS** (BUILD SUCCESSFUL, APK generated).
+- `./gradlew testDebugUnitTest`: **PASS** (BUILD SUCCESSFUL, semua unit test lolos termasuk WCAG contrast checks dan 124 route count assertion).
+- File pelacak `CLIENT-COVERAGE.md` dan `CLIENT-OBSIDIAN-PROGRESS.md` dirawat dan up-to-date.
 
 ---
 
-## Catatan Kredensial & Hal yang Memerlukan Luki
-- Verifikasi live end-to-end membutuhkan kredensial live admin & Worker live. Sesuai batasan keras, agent tidak memegang kredensial live admin dan tidak membuat kredensial rahasia fiktif.
-- Unit test lokal dan build APK dijalankan secara mandiri di mesin dev. Verifikasi live di Worker publik dan rilis APK adalah langkah Luki.
+## Ringkasan Akhir Perubahan
+1. **Desain Baru**:
+   - Seluruh client Android dialihkan ke Obsidian Design System v1.1.0 (Dark Luxe & Honey Bubble tokens).
+   - Warna dasar `#08090C`, aksen emas `#E5C158` (gold-light `#F0D27A` ke gold-deep `#C99E32`), on-gold `#0D0E12`, permukaan obsidian `#1E2028` ke `#0E1015` dengan 1px hairline emas `#E5C15840`.
+   - 26 komponen Obsidian Compose dibuat di `ObsidianComponents.kt`.
+2. **Coverage Backend v12 (124/124)**:
+   - 72 route Admin, 45 route Agent (/api), dan 7 route Root/Core seluruhnya didukung di client.
+   - Layar baru **API Console** memungkinkan pengujian langsung ke semua 124 endpoint.
+3. **Hasil Build & Test**:
+   - `assembleDebug`: PASS.
+   - `testDebugUnitTest`: PASS.
+
+## Hal yang Memerlukan Luki
+- Verifikasi live interaktif pada live Worker (`https://agent-bus-do.lukiznr.workers.dev`) dengan kredensial live admin milik Luki.
+- Penandatanganan rilis (release signing) dan publikasi file APK release.

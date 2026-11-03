@@ -748,6 +748,187 @@ data class CreateTemplateResponse(
     val template: TaskTemplateRecord? = null
 )
 
+// Cutover Models
+@Serializable
+data class CutoverChecklistRequest(
+    val item: String,
+    val done: Boolean = true
+)
+
+@Serializable
+data class CutoverFlipRequest(
+    val direction: String = "v12",
+    val force: Boolean = false
+)
+
+@Serializable
+data class CutoverStatusResponse(
+    val ok: Boolean = true,
+    val status: String = "operational",
+    val target: String = "v12",
+    val checklist: Map<String, Boolean> = emptyMap(),
+    val flipped: Boolean = false,
+    val details: JsonElement? = null
+)
+
+// Ledger Models
+@Serializable
+data class LedgerEntryRecord(
+    val id: Int = 0,
+    val title: String = "",
+    val statement: String = "",
+    val dissent: Boolean = false,
+    val status: String = "active",
+    val author: String = "",
+    @SerialName("created_at") val createdAt: String? = null,
+    val contradiction: Boolean = false,
+    val resolver: String? = null,
+    @SerialName("superseded_by") val supersededBy: Int? = null
+)
+
+@Serializable
+data class LedgerResponse(
+    val ok: Boolean = true,
+    val count: Int = 0,
+    val entries: List<LedgerEntryRecord> = emptyList()
+)
+
+@Serializable
+data class LedgerEntryDetailResponse(
+    val ok: Boolean = true,
+    val entry: LedgerEntryRecord? = null
+)
+
+@Serializable
+data class LedgerEventRecord(
+    val id: Int = 0,
+    @SerialName("ledger_id") val ledgerId: Int = 0,
+    val event: String = "",
+    val ts: Long = 0L,
+    val actor: String = "",
+    val details: JsonElement? = null
+)
+
+@Serializable
+data class LedgerEventsResponse(
+    val ok: Boolean = true,
+    val events: List<LedgerEventRecord> = emptyList()
+)
+
+@Serializable
+data class LedgerActionRequest(
+    val reason: String = "",
+    val details: String? = null,
+    val target: String? = null
+)
+
+@Serializable
+data class LedgerSeedRequest(
+    val count: Int = 5,
+    val reset: Boolean = false
+)
+
+// Task Dependencies Models
+@Serializable
+data class TaskDependencyRecord(
+    val id: Int = 0,
+    @SerialName("task_id") val taskId: Int = 0,
+    @SerialName("blocker_id") val blockerId: Int = 0,
+    val reason: String = "",
+    @SerialName("created_at") val createdAt: String? = null
+)
+
+@Serializable
+data class TaskDependenciesResponse(
+    val ok: Boolean = true,
+    val dependencies: List<TaskDependencyRecord> = emptyList()
+)
+
+@Serializable
+data class AddDependencyRequest(
+    @SerialName("blocker_id") val blockerId: Int,
+    val reason: String = ""
+)
+
+@Serializable
+data class DependencyEventRecord(
+    val id: Int = 0,
+    @SerialName("task_id") val taskId: Int = 0,
+    val event: String = "",
+    val ts: Long = 0L,
+    val details: JsonElement? = null
+)
+
+@Serializable
+data class DependencyEventsResponse(
+    val ok: Boolean = true,
+    val events: List<DependencyEventRecord> = emptyList()
+)
+
+// Sweep Health & Discovery & Wake Models
+@Serializable
+data class SweepHealthResponse(
+    val ok: Boolean = true,
+    val status: String = "healthy",
+    @SerialName("sweep_count") val sweepCount: Int = 0,
+    @SerialName("last_sweep") val lastSweep: String? = null
+)
+
+@Serializable
+data class DiscoveryResponse(
+    val ok: Boolean = true,
+    val version: String = "v12",
+    val spec: String = "",
+    val capabilities: List<String> = emptyList()
+)
+
+@Serializable
+data class WakeResponse(
+    val ok: Boolean = true,
+    val message: String = "agent awakened",
+    val agents: List<String> = emptyList()
+)
+
+// Audit Purge Models
+@Serializable
+data class AuditPurgeRequest(
+    @SerialName("older_than_sec") val olderThanSec: Long = 86400L,
+    @SerialName("dry_run") val dryRun: Boolean = false
+)
+
+@Serializable
+data class AuditPurgeResponse(
+    val ok: Boolean = true,
+    @SerialName("purged_count") val purgedCount: Int = 0
+)
+
+// Generic Raw Route Execution Models
+enum class RouteGroup(val title: String) {
+    ADMIN("Admin"),
+    AGENT("Agent (/api)"),
+    CORE("Root / Core")
+}
+
+data class RouteDescriptor(
+    val id: Int,
+    val method: String,
+    val path: String,
+    val group: RouteGroup,
+    val description: String,
+    val sampleBody: String? = null,
+    val defaultParams: Map<String, String> = emptyMap()
+)
+
+data class RouteExecutionResult(
+    val routeId: Int,
+    val method: String,
+    val path: String,
+    val statusCode: Int,
+    val latencyMs: Long,
+    val responseBody: String,
+    val isSuccess: Boolean
+)
+
 // Persistent State Models (Feed Anchor & Poll Cursor)
 @Serializable
 data class PollCursor(
