@@ -1,17 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Three brand dots: Nyx purple, Ryuki blue, nosmile99 amber. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
     <path
-        android:fillColor="#A855F7"
-        android:pathData="M30,54a14,14 0 1,0 28,0a14,14 0 1,0 -28,0" />
+        android:fillColor="#B83214"
+        android:pathData="M28,28h52v12h-52z" />
     <path
-        android:fillColor="#38BDF8"
-        android:pathData="M47,54a14,14 0 1,0 28,0a14,14 0 1,0 -28,0" />
+        android:fillColor="#F6F4EE"
+        android:pathData="M28,48h36v10h-36z" />
     <path
-        android:fillColor="#F59E0B"
-        android:pathData="M64,54a14,14 0 1,0 28,0a14,14 0 1,0 -28,0" />
+        android:fillColor="#F6F4EE"
+        android:pathData="M28,66h52v10h-52z" />
 </vector>

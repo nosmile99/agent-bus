@@ -1,7 +1,7 @@
 // BusDO — the agent-bus hub as a Cloudflare Durable Object.
 import { Hono } from 'hono';
 import { json } from './utils.js';
-import { runMigrations, migrateV3, migrateV4 } from './db/migrations.js';
+import { runMigrations, migrateV3, migrateV4, migrateV6 } from './db/migrations.js';
 import * as eventMethods from './db/events.js';
 import * as agentHandlers from './handlers/agents.js';
 import * as channelHandlers from './handlers/channels.js';
@@ -9,7 +9,6 @@ import * as messageHandlers from './handlers/messages.js';
 import * as pollHandlers from './handlers/poll.js';
 import * as adminHandlers from './handlers/admin.js';
 import * as kanbanHandlers from './handlers/kanban.js';
-import { handleAdminPanel } from './panel.js';
 import { createRouter } from './routes/index.js';
 import type {
   IBusDO,
@@ -19,6 +18,9 @@ import type {
   TaskWithTodos,
   TaskDetailResponse,
   TaskSearchOpts,
+  TaskLane,
+  WipWarning,
+  AutoClaimResult,
 } from './types.js';
 
 export class BusDO implements IBusDO {
@@ -71,29 +73,34 @@ export class BusDO implements IBusDO {
     return migrateV4(this);
   }
 
+  migrateV6(): void {
+    return migrateV6(this);
+  }
+
   // ---------- DO alarm: staleness sweep + event retention prune ----------
   // Runs 5 min after boot, then hourly (rescheduled at the end).
   async alarm(): Promise<void> {
     try {
       const now = Math.floor(Date.now() / 1000);
-      // Task staleness (kanban rev 4): status='doing' AND last_activity_at older
-      // than 24h. Emits kanban.task.stale ONCE per transition, guarded by
-      // stale_notified_at (reset when last_activity_at advances past it).
+      // Task staleness (kanban rev 4/5): status='doing' AND last_activity_at older
+      // than 24h. Emits kanban.task.stale and writes kbSystemLog ONCE per transition,
+      // guarded by stale_notified_at (reset when last_activity_at advances past it).
       const staleCutoff = now - 86400;
       const staleTasks = this.sql
         .exec(
-          `SELECT id, project_id FROM tasks
+          `SELECT id, project_id, lane, assignee FROM tasks
            WHERE status = 'doing' AND last_activity_at < ?
              AND (stale_notified_at IS NULL OR stale_notified_at < last_activity_at)`,
           staleCutoff
         )
-        .toArray() as Array<{ id: number; project_id: number }>;
+        .toArray() as Array<{ id: number; project_id: number; lane: TaskLane; assignee: string | null }>;
       for (const t of staleTasks) {
         this.sql.exec(`UPDATE tasks SET stale_notified_at = ? WHERE id = ?`, now, t.id);
+        this.kbSystemLog(t.id, "task marked stale (no activity for 24h)");
         this.emitEvent("kanban.task.stale", {
           actor: "system",
           project_id: t.project_id,
-          payload: { id: t.id },
+          payload: { id: t.id, task_id: t.id, lane: t.lane, assignee: t.assignee },
         });
       }
       // Agent staleness: registered but no poll/WS heartbeat within 24h.
@@ -177,6 +184,16 @@ export class BusDO implements IBusDO {
   ) => { ok?: true; error?: string; code: number };
   kbTaskDetail!: (row: TaskRecord) => TaskDetailResponse;
   kbTaskSearchWhere!: (opts: TaskSearchOpts) => { where: string; params: (string | number)[]; order: string };
+  kbDefaultOrder!: (tableAlias?: string) => string;
+  kbStartOfTodayJakarta!: (nowSec?: number) => number;
+  kbAgentLane!: (agent: string) => TaskLane;
+  kbLaneOwner!: (lane: TaskLane) => string | null;
+  kbWipWarning!: (assignee: string | null) => WipWarning | undefined;
+  kbAutoClaimOrVerify!: (
+    taskId: number,
+    agent: string,
+    opts?: { isStatusEndpoint?: boolean; requestedStatus?: string; requestedLane?: string }
+  ) => AutoClaimResult;
   kbTodosFor!: (taskId: number) => TodoRecord[];
   kbTaskWithTodos!: (row: TaskRecord) => TaskWithTodos;
   kbNow!: () => number;
@@ -231,7 +248,6 @@ export class BusDO implements IBusDO {
 
   handleAdminApiStats!: (req: Request) => Promise<Response>;
   handleAdminApiPassword!: (req: Request) => Promise<Response>;
-  handleAdminPanel!: (req: Request) => Promise<Response>;
 
   handleKbAdminProjectsList!: (req: Request) => Promise<Response>;
   handleKbAdminProjectCreate!: (req: Request) => Promise<Response>;
@@ -254,8 +270,13 @@ export class BusDO implements IBusDO {
     opts: { isAdmin: boolean; agent: string | null; projectId: number | null }
   ) => Promise<Response>;
   handleKbAgentTaskDetail!: (req: Request, id: number) => Promise<Response>;
-  handleKbAgentTaskUpdate!: (req: Request, id: number) => Promise<Response>;
+  handleKbAgentTaskUpdate!: (
+    req: Request,
+    id: number,
+    onlyField?: 'notes' | 'due_date' | 'lane'
+  ) => Promise<Response>;
   handleKbAgentTaskClaim!: (req: Request, id: number) => Promise<Response>;
+  handleKbAgentTaskRelease!: (req: Request, id: number) => Promise<Response>;
   handleKbAgentTaskStatus!: (req: Request, id: number) => Promise<Response>;
   handleKbAgentTodoCreate!: (req: Request, taskId: number) => Promise<Response>;
   handleKbCommentList!: (
@@ -277,6 +298,23 @@ export class BusDO implements IBusDO {
   handleKbAdminTaskDetail!: (req: Request, id: number) => Promise<Response>;
   handleKbAdminLabelAdd!: (req: Request, taskId: number) => Promise<Response>;
   handleKbAdminLabelRemove!: (req: Request, taskId: number, label: string) => Promise<Response>;
+
+  handleKbActivity!: (
+    req: Request,
+    url: URL,
+    opts: { isAdmin: boolean; agent: string | null; projectId: number | null }
+  ) => Promise<Response>;
+  handleKbSummary!: (
+    req: Request,
+    url: URL,
+    opts: { isAdmin: boolean; agent: string | null; projectId: number | null }
+  ) => Promise<Response>;
+  handleKbTemplatesList!: (req: Request, opts: { isAdmin: boolean }) => Promise<Response>;
+  handleKbAdminTemplateCreate!: (req: Request) => Promise<Response>;
+  handleKbAdminWipGet!: (req: Request) => Promise<Response>;
+  handleKbAdminWipPut!: (req: Request) => Promise<Response>;
+  handleKbAdminLaneMappingGet!: (req: Request) => Promise<Response>;
+  handleKbAdminLaneMappingPut!: (req: Request) => Promise<Response>;
 }
 
 // Attach all domain methods and handlers to BusDO prototype
@@ -288,8 +326,7 @@ Object.assign(
   messageHandlers,
   pollHandlers,
   adminHandlers,
-  kanbanHandlers,
-  { handleAdminPanel }
+  kanbanHandlers
 );
 
 // SAFEGUARD: Explicitly ensure critical handlers are on prototype (bundler may drop Object.assign)
