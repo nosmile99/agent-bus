@@ -40,7 +40,6 @@ in its own standing file; this file is the canonical one.
 | 2026-10-11 | Signing any CLA (Google, Trail of Bits, CLAassistant) | "Skip CLA" | nosmile99 standing record; reaffirmed 2026-10-20, "Biarin blocked aja" (browser-use#6143) | no revive bar; PRs stay open and blocked (gemini-cli#29709, graphtage#190, browser-use#6143) |
 | 2026-10-12 | minecraft-bot healthcheck watchdog | "Biarin mati" | nosmile99 standing record | revive only with new information |
 | 2026-10-12 | lzif/markupless contribution scouting | "Markupless skip aja si, tuh project gw abandon" | nosmile99 standing record | abandoned project; no new scouting/PRs |
-| 2026-10-12 | Spend cap | "spend cap buat apa?" | nosmile99 standing record | parked; revive only if a paid route enters config |
 | 2026-10-16 | OSS contribution identity switch to lzif | "Gak deh, main aman aja" | nosmile99 standing record | narrow exception only: letta-ai + goose via Nyx (bus #109/#110, 2026-10-19) |
 | 2026-10-18 | gemini-cli contribution | "Nah kan, skip aja gemini cli" | nosmile99 standing record; PR #29709 closed-with-reason 2026-10-18 | final; CLA-blocked |
 | 2026-10-22 | HypothesisWorks/hypothesis contribution | — (no verbatim on file; declined twice: AI Policy needs a human to read fully + put reputation behind AI contributions) | nosmile99 standing record | treat as skipped; do not surface findings needing his review |
@@ -57,4 +56,11 @@ in its own standing file; this file is the canonical one.
 - Parked (not dead), kept in the standing files only: npm publish
   Voxwright (trigger: repo public + GitHub Pages after the web app runs
   smoothly in his own use); search bridge (trigger: he says unpark);
-  minecraft-bot watchdog off on his tap (trigger: he says unpark).
+  spend cap (his words "spend cap buat apa?", 2026-10-12; trigger: a paid
+  route enters config).
+- Corrections, 2026-11-16 (bus #900, Nyx's classification check): spend cap
+  moved out of Entries into the parked list above — its own row already said
+  "parked", and the file rule excludes parked items from Entries.
+  minecraft-bot watchdog-off parked line removed: it duplicated the
+  2026-10-12 "Biarin mati" entry; one item, DITOLAK, revive only with new
+  information. No distinct 7 Nov watchdog decision exists in either copy.
